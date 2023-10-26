@@ -9,6 +9,14 @@ bool isASCII(char c) {
     return (c >= 32 && c <= 126);
 }
 
+void replacePercent20WithSlash(std::string& str) {
+    size_t found = str.find("%20");
+    while (found != std::string::npos) {
+        str.replace(found, 3, "/");
+        found = str.find("%20", found + 1);
+    }
+}
+
 int main() {
     std::string filename;
     char* buffer = new char[CHUNK_SIZE];
@@ -31,42 +39,50 @@ int main() {
 
             size_t pos1, pos2;
 
+            // Handle "ms-shellactivity" pattern
             pos1 = data.find("ms-shellactivity");
             if (pos1 != std::string::npos) {
                 pos2 = data.find(".exe", pos1);
                 if (pos2 != std::string::npos) {
-                    std::string match = data.substr(pos1, pos2 - pos1 + 4);
+                    std::string match = data.substr(pos1 + 16, pos2 - pos1 - 16 + 4); // +16 to skip "ms-shellactivity"
                     match.erase(std::remove_if(match.begin(), match.end(), [](char c) { return !isASCII(c) || std::isspace(c); }), match.end());
+                    replacePercent20WithSlash(match);
                     std::cout << "File execution detected: " << match << std::endl;
                 }
             }
 
+            // Handle "file:///" pattern
+            pos1 = data.find("file:///");
+            if (pos1 != std::string::npos) {
+                pos2 = data.find(".exe", pos1);
+                if (pos2 != std::string::npos) {
+                    std::string match = data.substr(pos1 + 8, pos2 - pos1 - 8 + 4); // +8 to skip "file://"
+                    match.erase(std::remove_if(match.begin(), match.end(), [](char c) { return !isASCII(c) || std::isspace(c); }), match.end());
+                    replacePercent20WithSlash(match);
+                    std::cout << "File execution detected: " << match << std::endl;
+                }
+            }
+
+            // Handle "IsInVirtualizationContainer" pattern
             pos1 = data.find("IsInVirtualizationContainer");
             if (pos1 != std::string::npos) {
                 pos2 = data.find(".exe", pos1);
                 if (pos2 != std::string::npos) {
                     std::string match = data.substr(pos1, pos2 - pos1 + 4);
                     match.erase(std::remove_if(match.begin(), match.end(), [](char c) { return !isASCII(c) || std::isspace(c); }), match.end());
+                    replacePercent20WithSlash(match);
                     std::cout << "File execution detected: " << match << std::endl;
                 }
             }
 
-            pos1 = data.find("file:///");
-            if (pos1 != std::string::npos) {
-                pos2 = data.find(".exe", pos1);
-                if (pos2 != std::string::npos) {
-                    std::string match = data.substr(pos1, pos2 - pos1 + 4);
-                    match.erase(std::remove_if(match.begin(), match.end(), [](char c) { return !isASCII(c) || std::isspace(c); }), match.end());
-                    std::cout << "File execution detected: " << match << std::endl;
-                }
-            }
-
+            // Handle "[{\"application\"" pattern
             pos1 = data.find("[{\"application\"");
             if (pos1 != std::string::npos) {
                 pos2 = data.find(".exe", pos1);
                 if (pos2 != std::string::npos) {
                     std::string match = data.substr(pos1, pos2 - pos1 + 4);
                     match.erase(std::remove_if(match.begin(), match.end(), [](char c) { return !isASCII(c) || std::isspace(c); }), match.end());
+                    replacePercent20WithSlash(match);
                     std::cout << "File execution detected: " << match << std::endl;
                 }
             }
