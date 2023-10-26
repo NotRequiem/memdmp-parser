@@ -51,6 +51,16 @@ int main() {
                 }
             }
 
+            pos1 = data.find("file:///");
+            if (pos1 != std::string::npos) {
+                pos2 = data.find(".exe", pos1);
+                if (pos2 != std::string::npos) {
+                    std::string match = data.substr(pos1, pos2 - pos1 + 4);
+                    match.erase(std::remove_if(match.begin(), match.end(), [](char c) { return !isASCII(c) || std::isspace(c); }), match.end());
+                    std::cout << "File execution detected: " << match << std::endl;
+                }
+            }
+
             pos1 = data.find("[{\"application\"");
             if (pos1 != std::string::npos) {
                 pos2 = data.find(".exe", pos1);
