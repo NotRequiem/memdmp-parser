@@ -6,6 +6,7 @@
 #include <cctype>
 #include <set>
 #include <sstream>
+#include <memory>
 
 #define CHUNK_SIZE 4096
 
@@ -35,15 +36,13 @@ void ProcessResults(std::string& str) {
 
 int main(int argc, char* argv[]) {
     std::string filename;
-    char* buffer = new char[CHUNK_SIZE];
+    std::unique_ptr<char[]> buffer(new char[CHUNK_SIZE]);
     std::string overlapData;
     std::set<std::string> printedMatches;
 
     if (argc == 2) {
-        // If a command-line argument is provided, use it as the file path
         filename = argv[1];
     } else {
-        // If no arguments are provided, ask the user for the file path
         std::cout << "Enter the file path of your memory image (e.g., D:\\Downloads\\memdump.mem): ";
         std::getline(std::cin, filename);
     }
@@ -51,7 +50,6 @@ int main(int argc, char* argv[]) {
     std::ifstream file(filename, std::ios::binary);
     if (!file.is_open()) {
         std::cerr << "File open failed" << std::endl;
-        delete[] buffer;
         return 1;
     }
 
@@ -60,24 +58,24 @@ int main(int argc, char* argv[]) {
     std::cin >> outputChoice;
     std::cin.ignore();
 
-    std::ostream* output = nullptr;
+    std::unique_ptr<std::ostream> output;
 
     if (outputChoice == 'F' || outputChoice == 'f') {
         std::string outputFilePath = "memdump_results.txt";
-        output = new std::ofstream(outputFilePath);
+        output = std::make_unique<std::ofstream>(outputFilePath);
         if (!output->good()) {
             std::cerr << "Failed to open the output file." << std::endl;
-            delete output;
-            delete[] buffer;
             return 1;
         }
     }
 
-    while (!file.eof()) {
-        file.read(buffer, CHUNK_SIZE);
+    bool done = false;
+
+    while (!done) {
+        file.read(buffer.get(), CHUNK_SIZE);
         std::streamsize bytesRead = file.gcount();
         if (bytesRead > 0) {
-            std::string data(buffer, static_cast<size_t>(bytesRead));
+            std::string data(buffer.get(), static_cast<size_t>(bytesRead));
             data = overlapData + data;
             overlapData.clear();
 
@@ -126,7 +124,7 @@ int main(int argc, char* argv[]) {
                 if (it != dataSubstring.end()) {
                     pos2 = pos1 + static_cast<size_t>(std::distance(dataSubstring.begin(), it));
                     std::string match = data.substr(pos1 + 12, pos2 - pos1 - 12 + 4);
-                    
+
                     if (match.find("HarddiskVolume") != std::string::npos) {
                         size_t volumePos = match.find("\\\\Device");
                         if (volumePos != std::string::npos) {
@@ -143,9 +141,9 @@ int main(int argc, char* argv[]) {
                     }
 
                     if (match.length() <= 110 && printedMatches.find(match) == printedMatches.end()) {
-                        if (outputChoice == 'C' || outputChoice == 'c') {
+                        if (outputChoice == 'C' or outputChoice == 'c') {
                             std::cout << "File execution detected: " << match << std::endl;
-                        } else if (outputChoice == 'F' || outputChoice == 'f') {
+                        } else if (outputChoice == 'F' or outputChoice == 'f') {
                             (*output) << "File execution detected: " << match << std::endl;
                         }
                         printedMatches.insert(match);
@@ -154,16 +152,13 @@ int main(int argc, char* argv[]) {
             }
 
             overlapData = data.substr(data.size() - 1645);
+        } else {
+            done = true;
         }
-    }
-
-    if (output) {
-        delete output;
     }
 
     std::cout << "Scan finished. Press Enter to exit the program...";
     std::cin.get();
 
-    delete[] buffer;
     return 0;
 }
