@@ -33,14 +33,20 @@ void ProcessResults(std::string& str) {
     str.erase(std::remove_if(str.begin(), str.end(), [](char c) { return !(c >= 32 && c <= 126) || std::isspace(c); }), str.end());
 }
 
-int main() {
+int main(int argc, char* argv[]) {
     std::string filename;
     char* buffer = new char[CHUNK_SIZE];
     std::string overlapData;
     std::set<std::string> printedMatches;
 
-    std::cout << "Enter the file path of your memory image (e.g., D:\\Downloads\\memdump.mem): ";
-    std::getline(std::cin, filename);
+    if (argc == 2) {
+        // If a command-line argument is provided, use it as the file path
+        filename = argv[1];
+    } else {
+        // If no arguments are provided, ask the user for the file path
+        std::cout << "Enter the file path of your memory image (e.g., D:\\Downloads\\memdump.mem): ";
+        std::getline(std::cin, filename);
+    }
 
     std::ifstream file(filename, std::ios::binary);
     if (!file.is_open()) {
@@ -112,9 +118,7 @@ int main() {
                     pos2 = pos1 + static_cast<size_t>(std::distance(dataSubstring.begin(), it));
                     std::string match = data.substr(pos1 + 12, pos2 - pos1 - 12 + 4);
                     
-                    // Check if the match contains "HarddiskVolume"
                     if (match.find("HarddiskVolume") != std::string::npos) {
-                        // Replace the path with a proper drive letter
                         size_t volumePos = match.find("\\\\Device");
                         if (volumePos != std::string::npos) {
                             char driveLetter = 'A' + match[volumePos + 24] - '1';
@@ -122,6 +126,13 @@ int main() {
                             match.replace(volumePos, 25, driveLetterStr + ":");
                         }
                     }
+
+                    size_t doubleBackslashPos = match.find("\\\\");
+                    while (doubleBackslashPos != std::string::npos) {
+                        match.replace(doubleBackslashPos, 2, "\\");
+                        doubleBackslashPos = match.find("\\\\", doubleBackslashPos + 1);
+                    }
+
                     if (match.length() <= 110 && printedMatches.find(match) == printedMatches.end()) {
                         if (outputChoice == 'C' || outputChoice == 'c') {
                             std::cout << "File execution detected: " << match << std::endl;
