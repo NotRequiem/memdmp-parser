@@ -5,6 +5,7 @@
 #include <unordered_set>
 #include <memory>
 #include <vector>
+#include <limits>
 
 constexpr size_t CHUNK_SIZE = 4096;
 
@@ -37,7 +38,6 @@ int main(int argc, char* argv[]) {
     std::vector<char> buffer(CHUNK_SIZE);
     std::string overlapData;
     std::unordered_set<std::string> printedMatches;
-
     std::unique_ptr<std::ostream> output;
 
     if (argc == 2) {
@@ -47,23 +47,35 @@ int main(int argc, char* argv[]) {
         std::getline(std::cin, filename);
     }
 
+    char outputChoice;
+    bool validChoice = false;
+
+    while (!validChoice) {
+        std::cout << "Do you want to print the matched strings to the console (C) or to a file (F)? ";
+        std::cin >> outputChoice;
+
+        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+
+        if (outputChoice == 'C' || outputChoice == 'c' || outputChoice == 'F' || outputChoice == 'f') {
+            validChoice = true;
+        } else {
+            std::cerr << "Invalid choice. Please enter 'C' for console or 'F' for file." << std::endl;
+        }
+    }
+
     std::ifstream file(filename, std::ios::binary);
+
     if (!file.is_open()) {
         std::cerr << "File open failed" << std::endl;
         return 1;
     }
-
-    std::cout << "Do you want to print the matched strings to the console (C) or to a file (F)? ";
-    char outputChoice;
-    std::cin >> outputChoice;
-    std::cin.ignore();
 
     if (outputChoice == 'F' || outputChoice == 'f') {
         std::string outputFilePath = "memdump_results.txt";
         output = std::make_unique<std::ofstream>(outputFilePath);
 
         if (!output->good()) {
-            std::cerr << "Failed to open the output file." << std::endl;
+            std::cerr << "Failed to open the output file. Try to select the 'C' option to print results to the console if this keeps happening." << std::endl;
             return 1;
         }
     }
@@ -141,9 +153,9 @@ int main(int argc, char* argv[]) {
 
                     if (match.length() <= 110 && printedMatches.find(match) == printedMatches.end()) {
                         if (outputChoice == 'C' or outputChoice == 'c') {
-                            std::cout << "File execution detected: " << match << std::endl;
+                            std::cout << "Executed file: " << match << std::endl;
                         } else if (outputChoice == 'F' or outputChoice == 'f') {
-                            (*output) << "File execution detected: " << match << std::endl;
+                            (*output) << "Executed file: " << match << std::endl;
                         }
                         printedMatches.insert(match);
                     }
@@ -161,9 +173,9 @@ int main(int argc, char* argv[]) {
             printedMatch[1] == ':' && printedMatch[2] == '\\') {
             if (!std::ifstream(printedMatch)) {
                 if (outputChoice == 'C' || outputChoice == 'c') {
-                    std::cout << "File no longer exists: " << printedMatch << std::endl;
+                    std::cout << "Deleted file (file could not be found): " << printedMatch << std::endl;
                 } else if (outputChoice == 'F' || outputChoice == 'f') {
-                    (*output) << "File no longer exists: " << printedMatch << std::endl;
+                    (*output) << "Deleted file (file could not be found): " << printedMatch << std::endl;
                 }
             }
         }
