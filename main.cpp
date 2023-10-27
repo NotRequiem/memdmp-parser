@@ -5,6 +5,7 @@
 #include <cstring>
 #include <cctype>
 #include <set>
+#include <sstream>
 
 #define CHUNK_SIZE 4096
 
@@ -110,7 +111,17 @@ int main() {
                 if (it != dataSubstring.end()) {
                     pos2 = pos1 + static_cast<size_t>(std::distance(dataSubstring.begin(), it));
                     std::string match = data.substr(pos1 + 12, pos2 - pos1 - 12 + 4);
-                    ProcessResults(match);
+                    
+                    // Check if the match contains "HarddiskVolume"
+                    if (match.find("HarddiskVolume") != std::string::npos) {
+                        // Replace the path with a proper drive letter
+                        size_t volumePos = match.find("\\\\Device");
+                        if (volumePos != std::string::npos) {
+                            char driveLetter = 'A' + match[volumePos + 24] - '1';
+                            std::string driveLetterStr(1, driveLetter);
+                            match.replace(volumePos, 25, driveLetterStr + ":");
+                        }
+                    }
                     if (match.length() <= 110 && printedMatches.find(match) == printedMatches.end()) {
                         if (outputChoice == 'C' || outputChoice == 'c') {
                             std::cout << "File execution detected: " << match << std::endl;
