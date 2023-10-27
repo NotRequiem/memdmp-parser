@@ -48,12 +48,29 @@ int main() {
         return 1;
     }
 
+    std::cout << "Do you want to print the matched strings to the console (C) or to a file (F)? ";
+    char outputChoice;
+    std::cin >> outputChoice;
+    std::cin.ignore();
+
+    std::ostream* output = nullptr;
+
+    if (outputChoice == 'F' || outputChoice == 'f') {
+        std::string outputFilePath = "memdump_results.txt";
+        output = new std::ofstream(outputFilePath);
+        if (!output->good()) {
+            std::cerr << "Failed to open the output file." << std::endl;
+            delete output;
+            delete[] buffer;
+            return 1;
+        }
+    }
+
     while (!file.eof()) {
         file.read(buffer, CHUNK_SIZE);
         std::streamsize bytesRead = file.gcount();
         if (bytesRead > 0) {
             std::string data(buffer, static_cast<size_t>(bytesRead));
-
             data = overlapData + data;
             overlapData.clear();
 
@@ -63,20 +80,23 @@ int main() {
             if (pos1 != std::string::npos) {
                 auto dataSubstring = data.substr(pos1);
                 auto it = std::search(dataSubstring.begin(), dataSubstring.end(), ".exe", ".exe" + 4,
-                        [](char a, char b) {
-                            return std::tolower(a) == std::tolower(b);
-                        });
+                    [](char a, char b) {
+                        return std::tolower(a) == std::tolower(b);
+                    });
 
-                    if (it != dataSubstring.end()) {
+                if (it != dataSubstring.end()) {
                     pos2 = pos1 + static_cast<size_t>(std::distance(dataSubstring.begin(), it));
-                        std::string match = data.substr(pos1 + 8, pos2 - pos1 - 8 + 4);
-                        ProcessResults(match);
-                        if (match.length() <= 110 && printedMatches.find(match) == printedMatches.end()) {
-                        std::cout << "File execution detected: " << match << std::endl;
+                    std::string match = data.substr(pos1 + 8, pos2 - pos1 - 8 + 4);
+                    ProcessResults(match);
+                    if (match.length() <= 110 && printedMatches.find(match) == printedMatches.end()) {
+                        if (outputChoice == 'C' || outputChoice == 'c') {
+                            std::cout << "File execution detected: " << match << std::endl;
+                        } else if (outputChoice == 'F' || outputChoice == 'f') {
+                            (*output) << "File execution detected: " << match << std::endl;
+                        }
                         printedMatches.insert(match);
                     }
-                    }
-                
+                }
             }
 
             pos1 = data.find("ImageName");
@@ -88,11 +108,15 @@ int main() {
                     });
 
                 if (it != dataSubstring.end()) {
-                pos2 = pos1 + static_cast<size_t>(std::distance(dataSubstring.begin(), it));
+                    pos2 = pos1 + static_cast<size_t>(std::distance(dataSubstring.begin(), it));
                     std::string match = data.substr(pos1 + 12, pos2 - pos1 - 12 + 4);
                     ProcessResults(match);
                     if (match.length() <= 110 && printedMatches.find(match) == printedMatches.end()) {
-                        std::cout << "File execution detected: " << match << std::endl;
+                        if (outputChoice == 'C' || outputChoice == 'c') {
+                            std::cout << "File execution detected: " << match << std::endl;
+                        } else if (outputChoice == 'F' || outputChoice == 'f') {
+                            (*output) << "File execution detected: " << match << std::endl;
+                        }
                         printedMatches.insert(match);
                     }
                 }
@@ -100,6 +124,10 @@ int main() {
 
             overlapData = data.substr(data.size() - 1645);
         }
+    }
+
+    if (output) {
+        delete output;
     }
 
     delete[] buffer;
