@@ -1,39 +1,65 @@
 #include <iostream>
 #include <fstream>
 #include <string>
-#include <algorithm>
+#include <array>
 #include <unordered_set>
 #include <memory>
 #include <vector>
+#include <algorithm>
 #include <limits>
 
 constexpr size_t CHUNK_SIZE = 4096;
 
+// Precomputed toLower table
+std::array<char, 256> toLowerTable;
+
+void InitializeToLowerTable() {
+    for (int i = 0; i < 256; ++i) {
+        toLowerTable[i] = static_cast<char>(std::tolower(static_cast<unsigned char>(i)));
+    }
+}
+
+// Function to convert characters to lowercase using the table
+char ToLower(char c) {
+    return toLowerTable[static_cast<unsigned char>(c)];
+}
+
 void ProcessResults(std::string& str) {
     for (size_t i = 0; i < str.size(); ++i) {
-        if (str[i] == '%' && i + 2 < str.size()) {
-            if (str[i + 1] == '2') {
-                if (str[i + 2] == '0') {
-                    str[i] = ' ';
-                    str.erase(i + 1, 2);
-                } else if (str[i + 2] == '8') {
-                    str[i] = '(';
-                    str.erase(i + 1, 2);
-                } else if (str[i + 2] == '9') {
-                    str[i] = ')';
-                    str.erase(i + 1, 2);
+        switch (str[i]) {
+            case '%':
+                if (i + 2 < str.size()) {
+                    switch (str[i + 2]) {
+                        case '0':
+                            str[i] = ' ';
+                            str.erase(i + 1, 2);
+                            break;
+                        case '8':
+                            str[i] = '(';
+                            str.erase(i + 1, 2);
+                            break;
+                        case '9':
+                            str[i] = ')';
+                            str.erase(i + 1, 2);
+                            break;
+                    }
                 }
-            }
-        } else if (str[i] == '/') {
-            str[i] = '\\';
-        } else if (!(str[i] >= 32 && str[i] <= 126) || std::isspace(str[i])) {
-            str.erase(i, 1);
-            --i;
+                break;
+            case '/':
+                str[i] = '\\';
+                break;
+            default:
+                if (!(str[i] >= 32 && str[i] <= 126) || std::isspace(str[i])) {
+                    str.erase(i, 1);
+                    --i;
+                }
         }
     }
 }
 
 int main(int argc, char* argv[]) {
+    InitializeToLowerTable();
+
     std::string filename;
     std::vector<char> buffer(CHUNK_SIZE);
     std::string overlapData;
@@ -97,7 +123,7 @@ int main(int argc, char* argv[]) {
                 auto dataSubstring = data.substr(pos1);
                 auto it = std::search(dataSubstring.begin(), dataSubstring.end(), ".exe", ".exe" + 4,
                     [](char a, char b) {
-                        return std::tolower(a) == std::tolower(b);
+                        return ToLower(a) == ToLower(b);
                     });
 
                 if (it != dataSubstring.end()) {
@@ -129,7 +155,7 @@ int main(int argc, char* argv[]) {
                 auto dataSubstring = data.substr(pos1);
                 auto it = std::search(dataSubstring.begin(), dataSubstring.end(), ".exe", ".exe" + 4,
                     [](char a, char b) {
-                        return std::tolower(a) == std::tolower(b);
+                        return ToLower(a) == ToLower(b);
                     });
 
                 if (it != dataSubstring.end()) {
