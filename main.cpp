@@ -2,26 +2,43 @@
 #include <fstream>
 #include <string>
 #include <algorithm>
+#include <cstring>
+#include <cctype>
+#include <set>
 
 #define CHUNK_SIZE 4096
 
-bool isASCII(char c) {
-    return (c >= 32 && c <= 126);
-}
-
-void replacePercent20WithSlash(std::string& str) {
+void ProcessResults(std::string& str) {
     size_t found = str.find("%20");
     while (found != std::string::npos) {
-        str.replace(found, 3, "/");
+        str.replace(found, 3, " ");
         found = str.find("%20", found + 1);
     }
+
+    found = str.find("%28");
+    while (found != std::string::npos) {
+        str.replace(found, 3, "(");
+        found = str.find("%28", found + 1);
+    }
+
+    found = str.find("%29");
+    while (found != std::string::npos) {
+        str.replace(found, 3, ")");
+        found = str.find("%29", found + 1);
+    }
+
+    std::replace(str.begin(), str.end(), '/', '\\');
+
+    str.erase(std::remove_if(str.begin(), str.end(), [](char c) { return !(c >= 32 && c <= 126) || std::isspace(c); }), str.end());
 }
 
 int main() {
     std::string filename;
     char* buffer = new char[CHUNK_SIZE];
+    std::string overlapData;
+    std::set<std::string> printedMatches;
 
-    std::cout << "Enter the file path (e.g., D:\\Downloads\\memdump.mem): ";
+    std::cout << "Enter the file path of your memory image (e.g., D:\\Downloads\\memdump.mem): ";
     std::getline(std::cin, filename);
 
     std::ifstream file(filename, std::ios::binary);
@@ -37,55 +54,51 @@ int main() {
         if (bytesRead > 0) {
             std::string data(buffer, static_cast<size_t>(bytesRead));
 
+            data = overlapData + data;
+            overlapData.clear();
+
             size_t pos1, pos2;
 
-            // Handle "ms-shellactivity" pattern
-            pos1 = data.find("ms-shellactivity");
-            if (pos1 != std::string::npos) {
-                pos2 = data.find(".exe", pos1);
-                if (pos2 != std::string::npos) {
-                    std::string match = data.substr(pos1 + 16, pos2 - pos1 - 16 + 4); // +16 to skip "ms-shellactivity"
-                    match.erase(std::remove_if(match.begin(), match.end(), [](char c) { return !isASCII(c) || std::isspace(c); }), match.end());
-                    replacePercent20WithSlash(match);
-                    std::cout << "File execution detected: " << match << std::endl;
-                }
-            }
-
-            // Handle "file:///" pattern
             pos1 = data.find("file:///");
             if (pos1 != std::string::npos) {
-                pos2 = data.find(".exe", pos1);
-                if (pos2 != std::string::npos) {
-                    std::string match = data.substr(pos1 + 8, pos2 - pos1 - 8 + 4); // +8 to skip "file://"
-                    match.erase(std::remove_if(match.begin(), match.end(), [](char c) { return !isASCII(c) || std::isspace(c); }), match.end());
-                    replacePercent20WithSlash(match);
-                    std::cout << "File execution detected: " << match << std::endl;
+                auto dataSubstring = data.substr(pos1);
+                auto it = std::search(dataSubstring.begin(), dataSubstring.end(), ".exe", ".exe" + 4,
+                        [](char a, char b) {
+                            return std::tolower(a) == std::tolower(b);
+                        });
+
+                    if (it != dataSubstring.end()) {
+                    pos2 = pos1 + static_cast<size_t>(std::distance(dataSubstring.begin(), it));
+                        std::string match = data.substr(pos1 + 8, pos2 - pos1 - 8 + 4);
+                        ProcessResults(match);
+                        if (match.length() <= 110 && printedMatches.find(match) == printedMatches.end()) {
+                        std::cout << "File execution detected: " << match << std::endl;
+                        printedMatches.insert(match);
+                    }
+                    }
+                
+            }
+
+            pos1 = data.find("ImageName");
+            if (pos1 != std::string::npos) {
+                auto dataSubstring = data.substr(pos1);
+                auto it = std::search(dataSubstring.begin(), dataSubstring.end(), ".exe", ".exe" + 4,
+                    [](char a, char b) {
+                        return std::tolower(a) == std::tolower(b);
+                    });
+
+                if (it != dataSubstring.end()) {
+                pos2 = pos1 + static_cast<size_t>(std::distance(dataSubstring.begin(), it));
+                    std::string match = data.substr(pos1 + 12, pos2 - pos1 - 12 + 4);
+                    ProcessResults(match);
+                    if (match.length() <= 110 && printedMatches.find(match) == printedMatches.end()) {
+                        std::cout << "File execution detected: " << match << std::endl;
+                        printedMatches.insert(match);
+                    }
                 }
             }
 
-            // Handle "IsInVirtualizationContainer" pattern
-            pos1 = data.find("IsInVirtualizationContainer");
-            if (pos1 != std::string::npos) {
-                pos2 = data.find(".exe", pos1);
-                if (pos2 != std::string::npos) {
-                    std::string match = data.substr(pos1, pos2 - pos1 + 4);
-                    match.erase(std::remove_if(match.begin(), match.end(), [](char c) { return !isASCII(c) || std::isspace(c); }), match.end());
-                    replacePercent20WithSlash(match);
-                    std::cout << "File execution detected: " << match << std::endl;
-                }
-            }
-
-            // Handle "[{\"application\"" pattern
-            pos1 = data.find("[{\"application\"");
-            if (pos1 != std::string::npos) {
-                pos2 = data.find(".exe", pos1);
-                if (pos2 != std::string::npos) {
-                    std::string match = data.substr(pos1, pos2 - pos1 + 4);
-                    match.erase(std::remove_if(match.begin(), match.end(), [](char c) { return !isASCII(c) || std::isspace(c); }), match.end());
-                    replacePercent20WithSlash(match);
-                    std::cout << "File execution detected: " << match << std::endl;
-                }
-            }
+            overlapData = data.substr(data.size() - 1645);
         }
     }
 
