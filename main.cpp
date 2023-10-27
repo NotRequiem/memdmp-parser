@@ -95,16 +95,16 @@ int main(int argc, char* argv[]) {
                     pos2 = pos1 + static_cast<size_t>(std::distance(dataSubstring.begin(), it));
                     std::string match = data.substr(pos1 + 8, pos2 - pos1 - 8 + 4);
                     ProcessResults(match);
+
+                    if (match.find("ProgramFiles(x86)") != std::string::npos) {
+                        size_t pos = match.find("ProgramFiles(x86)");
+                        match.replace(pos, 17, "Program Files (x86)");
+                    } else if (match.find("ProgramFiles") != std::string::npos) {
+                        size_t pos = match.find("ProgramFiles");
+                        match.replace(pos, 12, "Program Files");
+                    }
+
                     if (match.length() <= 110 && printedMatches.find(match) == printedMatches.end()) {
-                        if (match.find("ProgramFiles(x86)") != std::string::npos) {
-                            // Replace "ProgramFiles(x86)" with "Program Files (x86)" in the match string
-                            size_t pos = match.find("ProgramFiles(x86)");
-                            match.replace(pos, 17, "Program Files (x86)");
-                        } else if (match.find("ProgramFiles") != std::string::npos) {
-                            // Replace "ProgramFiles" with "Program Files" in the match string
-                            size_t pos = match.find("ProgramFiles");
-                            match.replace(pos, 12, "Program Files");
-                        }
                         if (outputChoice == 'C' || outputChoice == 'c') {
                             std::cout << "File execution detected: " << match << std::endl;
                         } else if (outputChoice == 'F' || outputChoice == 'f') {
@@ -160,6 +160,9 @@ int main(int argc, char* argv[]) {
     if (output) {
         delete output;
     }
+
+    std::cout << "Scan finished. Press Enter to exit the program...";
+    std::cin.get();
 
     delete[] buffer;
     return 0;
