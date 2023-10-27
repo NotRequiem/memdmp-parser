@@ -2,13 +2,11 @@
 #include <fstream>
 #include <string>
 #include <algorithm>
-#include <cstring>
-#include <cctype>
 #include <set>
-#include <sstream>
 #include <memory>
+#include <vector>
 
-#define CHUNK_SIZE 4096
+constexpr size_t CHUNK_SIZE = 4096;
 
 void ProcessResults(std::string& str) {
     size_t found = str.find("%20");
@@ -36,9 +34,12 @@ void ProcessResults(std::string& str) {
 
 int main(int argc, char* argv[]) {
     std::string filename;
-    std::unique_ptr<char[]> buffer(new char[CHUNK_SIZE]);
+    std::vector<char> buffer(CHUNK_SIZE);
     std::string overlapData;
     std::set<std::string> printedMatches;
+
+    std::ifstream file;
+    std::unique_ptr<std::ostream> output;
 
     if (argc == 2) {
         filename = argv[1];
@@ -47,10 +48,12 @@ int main(int argc, char* argv[]) {
         std::getline(std::cin, filename);
     }
 
+    file.open(filename, std::ios::binary);
+
     std::ifstream file(filename, std::ios::binary);
     if (!file.is_open()) {
-        std::cerr << "File open failed" << std::endl;
-        return 1;
+    std::cerr << "File open failed" << std::endl;
+    return 1;
     }
 
     std::cout << "Do you want to print the matched strings to the console (C) or to a file (F)? ";
@@ -58,11 +61,10 @@ int main(int argc, char* argv[]) {
     std::cin >> outputChoice;
     std::cin.ignore();
 
-    std::unique_ptr<std::ostream> output;
-
     if (outputChoice == 'F' || outputChoice == 'f') {
         std::string outputFilePath = "memdump_results.txt";
         output = std::make_unique<std::ofstream>(outputFilePath);
+
         if (!output->good()) {
             std::cerr << "Failed to open the output file." << std::endl;
             return 1;
@@ -72,10 +74,10 @@ int main(int argc, char* argv[]) {
     bool done = false;
 
     while (!done) {
-        file.read(buffer.get(), CHUNK_SIZE);
+        file.read(buffer.data(), CHUNK_SIZE);
         std::streamsize bytesRead = file.gcount();
         if (bytesRead > 0) {
-            std::string data(buffer.get(), static_cast<size_t>(bytesRead));
+            std::string data(buffer.data(), static_cast<size_t>(bytesRead));
             data = overlapData + data;
             overlapData.clear();
 
@@ -155,6 +157,19 @@ int main(int argc, char* argv[]) {
         } else {
             done = true;
         }
+    }
+
+    for (const std::string& printedMatch : printedMatches) {
+    if (std::isalpha(printedMatch[0]) && printedMatch.size() >= 3 &&
+        printedMatch[1] == ':' && printedMatch[2] == '\\') {
+        if (!std::ifstream(printedMatch)) {
+            if (outputChoice == 'C' || outputChoice == 'c') {
+                std::cout << "File no longer exists: " << printedMatch << std::endl;
+            } else if (outputChoice == 'F' || outputChoice == 'f') {
+                (*output) << "File no longer exists: " << printedMatch << std::endl;
+            }
+        }
+    }
     }
 
     std::cout << "Scan finished. Press Enter to exit the program...";
