@@ -115,9 +115,9 @@ int main(int argc, char* argv[]) {
 
                     if (match.length() <= 110 && printedMatches.find(match) == printedMatches.end()) {
                         if (outputChoice == 'C' || outputChoice == 'c') {
-                            std::cout << "File execution detected: " << match << std::endl;
+                            std::cout << "Executed file: " << match << std::endl;
                         } else if (outputChoice == 'F' || outputChoice == 'f') {
-                            (*output) << "File execution detected: " << match << std::endl;
+                            (*output) << "Executed file: " << match << std::endl;
                         }
                         printedMatches.insert(match);
                     }
