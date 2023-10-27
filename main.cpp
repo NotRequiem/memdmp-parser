@@ -2,43 +2,42 @@
 #include <fstream>
 #include <string>
 #include <algorithm>
-#include <set>
+#include <unordered_set>
 #include <memory>
 #include <vector>
 
 constexpr size_t CHUNK_SIZE = 4096;
 
 void ProcessResults(std::string& str) {
-    size_t found = str.find("%20");
-    while (found != std::string::npos) {
-        str.replace(found, 3, " ");
-        found = str.find("%20", found + 1);
+    for (size_t i = 0; i < str.size(); ++i) {
+        if (str[i] == '%' && i + 2 < str.size()) {
+            if (str[i + 1] == '2') {
+                if (str[i + 2] == '0') {
+                    str[i] = ' ';
+                    str.erase(i + 1, 2);
+                } else if (str[i + 2] == '8') {
+                    str[i] = '(';
+                    str.erase(i + 1, 2);
+                } else if (str[i + 2] == '9') {
+                    str[i] = ')';
+                    str.erase(i + 1, 2);
+                }
+            }
+        } else if (str[i] == '/') {
+            str[i] = '\\';
+        } else if (!(str[i] >= 32 && str[i] <= 126) || std::isspace(str[i])) {
+            str.erase(i, 1);
+            --i;
+        }
     }
-
-    found = str.find("%28");
-    while (found != std::string::npos) {
-        str.replace(found, 3, "(");
-        found = str.find("%28", found + 1);
-    }
-
-    found = str.find("%29");
-    while (found != std::string::npos) {
-        str.replace(found, 3, ")");
-        found = str.find("%29", found + 1);
-    }
-
-    std::replace(str.begin(), str.end(), '/', '\\');
-
-    str.erase(std::remove_if(str.begin(), str.end(), [](char c) { return !(c >= 32 && c <= 126) || std::isspace(c); }), str.end());
 }
 
 int main(int argc, char* argv[]) {
     std::string filename;
     std::vector<char> buffer(CHUNK_SIZE);
     std::string overlapData;
-    std::set<std::string> printedMatches;
+    std::unordered_set<std::string> printedMatches;
 
-    std::ifstream file;
     std::unique_ptr<std::ostream> output;
 
     if (argc == 2) {
@@ -48,12 +47,10 @@ int main(int argc, char* argv[]) {
         std::getline(std::cin, filename);
     }
 
-    file.open(filename, std::ios::binary);
-
     std::ifstream file(filename, std::ios::binary);
     if (!file.is_open()) {
-    std::cerr << "File open failed" << std::endl;
-    return 1;
+        std::cerr << "File open failed" << std::endl;
+        return 1;
     }
 
     std::cout << "Do you want to print the matched strings to the console (C) or to a file (F)? ";
@@ -160,17 +157,19 @@ int main(int argc, char* argv[]) {
     }
 
     for (const std::string& printedMatch : printedMatches) {
-    if (std::isalpha(printedMatch[0]) && printedMatch.size() >= 3 &&
-        printedMatch[1] == ':' && printedMatch[2] == '\\') {
-        if (!std::ifstream(printedMatch)) {
-            if (outputChoice == 'C' || outputChoice == 'c') {
-                std::cout << "File no longer exists: " << printedMatch << std::endl;
-            } else if (outputChoice == 'F' || outputChoice == 'f') {
-                (*output) << "File no longer exists: " << printedMatch << std::endl;
+        if (std::isalpha(printedMatch[0]) && printedMatch.size() >= 3 &&
+            printedMatch[1] == ':' && printedMatch[2] == '\\') {
+            if (!std::ifstream(printedMatch)) {
+                if (outputChoice == 'C' || outputChoice == 'c') {
+                    std::cout << "File no longer exists: " << printedMatch << std::endl;
+                } else if (outputChoice == 'F' || outputChoice == 'f') {
+                    (*output) << "File no longer exists: " << printedMatch << std::endl;
+                }
             }
         }
     }
-    }
+
+    file.close();
 
     std::cout << "Scan finished. Press Enter to exit the program...";
     std::cin.get();
