@@ -74,6 +74,8 @@ void ProcessMatch(std::string& match, std::unordered_set<std::string>& printedMa
             doubleBackslashPos = match.find("\\\\", doubleBackslashPos + 1);
         }
 
+    ProcessResults(match);
+
     if (match.find("ProgramFiles(x86)") != std::string::npos) {
         size_t pos = match.find("ProgramFiles(x86)");
         match.replace(pos, 17, "Program Files (x86)");
@@ -81,8 +83,6 @@ void ProcessMatch(std::string& match, std::unordered_set<std::string>& printedMa
         size_t pos = match.find("ProgramFiles");
         match.replace(pos, 12, "Program Files");
     }
-
-    ProcessResults(match);
 
     if (match.length() <= 110 && printedMatches.find(match) == printedMatches.end()) {
         if (outputChoice == 'C' || outputChoice == 'c') {
