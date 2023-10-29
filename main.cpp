@@ -23,40 +23,42 @@ char ToLower(char c) {
 }
 
 void ProcessResults(std::string& str) {
-    for (size_t i = 0; i < str.size(); ++i) {
-        switch (str[i]) {
+    size_t length = str.size();
+    size_t writeIndex = 0;
+    for (size_t readIndex = 0; readIndex < length; ++readIndex) {
+        char currentChar = str[readIndex];
+        switch (currentChar) {
             case '%':
-                if (i + 2 < str.size()) {
-                    switch (str[i + 2]) {
+                if (readIndex + 2 < length) {
+                    switch (str[readIndex + 2]) {
                         case '0':
-                            str[i] = ' ';
-                            str.erase(i + 1, 2);
+                            currentChar = ' ';
+                            readIndex += 2;
                             break;
                         case '8':
-                            str[i] = '(';
-                            str.erase(i + 1, 2);
+                            currentChar = '(';
+                            readIndex += 2;
                             break;
                         case '9':
-                            str[i] = ')';
-                            str.erase(i + 1, 2);
+                            currentChar = ')';
+                            readIndex += 2;
                             break;
                     }
                 }
                 break;
             case '/':
-                str[i] = '\\';
+                currentChar = '\\';
                 break;
-            default:
-                if (!(str[i] >= 32 && str[i] <= 126) || std::isspace(str[i])) {
-                    str.erase(i, 1);
-                    --i;
-                }
+        }
+        if ((currentChar >= 32 && currentChar <= 126) && !std::isspace(currentChar)) {
+            str[writeIndex] = currentChar;
+            ++writeIndex;
         }
     }
+    str.resize(writeIndex);
 }
 
 void ProcessMatch(std::string& match, std::unordered_set<std::string>& printedMatches, char outputChoice, std::unique_ptr<std::ostream>& output) {
-    if (match.find("ImageName") != std::string::npos || match.find("AppPath") != std::string::npos) {
         if (match.find("HarddiskVolume") != std::string::npos) {
             size_t volumePos = match.find("\\\\Device");
             if (volumePos != std::string::npos) {
@@ -71,7 +73,6 @@ void ProcessMatch(std::string& match, std::unordered_set<std::string>& printedMa
             match.replace(doubleBackslashPos, 2, "\\");
             doubleBackslashPos = match.find("\\\\", doubleBackslashPos + 1);
         }
-    }
 
     if (match.find("ProgramFiles(x86)") != std::string::npos) {
         size_t pos = match.find("ProgramFiles(x86)");
