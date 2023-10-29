@@ -1,13 +1,11 @@
 #include <iostream>
 #include <fstream>
 #include <string>
-#include <string_view>
 #include <array>
 #include <unordered_set>
 #include <memory>
 #include <vector>
 #include <algorithm>
-#include <cctype>
 #include <limits>
 
 constexpr size_t CHUNK_SIZE = 330;
@@ -60,44 +58,39 @@ void ProcessResults(std::string& str) {
     str.resize(writeIndex);
 }
 
-void ProcessMatch(std::string_view match, std::unordered_set<std::string>& printedMatches, char outputChoice, std::unique_ptr<std::ostream>& output) {
-    if (match.find("HarddiskVolume") != std::string_view::npos) {
-        size_t volumePos = match.find("\\\\Device");
-        if (volumePos != std::string_view::npos) {
-            char driveLetter = 'A' + match[volumePos + 24] - '1';
-            std::string driveLetterStr(1, driveLetter);
-            std::string matchStr = std::string(match);
-            matchStr.replace(volumePos, 25, driveLetterStr + ":");
-            match = matchStr;
+void ProcessMatch(std::string& match, std::unordered_set<std::string>& printedMatches, char outputChoice, std::unique_ptr<std::ostream>& output) {
+        if (match.find("HarddiskVolume") != std::string::npos) {
+            size_t volumePos = match.find("\\\\Device");
+            if (volumePos != std::string::npos) {
+                char driveLetter = 'A' + match[volumePos + 24] - '1';
+                std::string driveLetterStr(1, driveLetter);
+                match.replace(volumePos, 25, driveLetterStr + ":");
+            }
         }
+
+        size_t doubleBackslashPos = match.find("\\\\");
+        while (doubleBackslashPos != std::string::npos) {
+            match.replace(doubleBackslashPos, 2, "\\");
+            doubleBackslashPos = match.find("\\\\", doubleBackslashPos + 1);
+        }
+
+    ProcessResults(match);
+
+    if (match.find("ProgramFiles(x86)") != std::string::npos) {
+        size_t pos = match.find("ProgramFiles(x86)");
+        match.replace(pos, 17, "Program Files (x86)");
+    } else if (match.find("ProgramFiles") != std::string::npos) {
+        size_t pos = match.find("ProgramFiles");
+        match.replace(pos, 12, "Program Files");
     }
 
-    size_t doubleBackslashPos = match.find("\\\\");
-    while (doubleBackslashPos != std::string_view::npos) {
-        std::string matchStr = std::string(match);
-        matchStr.replace(doubleBackslashPos, 2, "\\");
-        match = matchStr;
-        doubleBackslashPos = match.find("\\\\", doubleBackslashPos + 1);
-    }
-
-    std::string matchStr(match);
-    ProcessResults(matchStr);
-
-    if (matchStr.find("ProgramFiles(x86)") != std::string::npos) {
-        size_t pos = matchStr.find("ProgramFiles(x86)");
-        matchStr.replace(pos, 17, "Program Files (x86)");
-    } else if (matchStr.find("ProgramFiles") != std::string::npos) {
-        size_t pos = matchStr.find("ProgramFiles");
-        matchStr.replace(pos, 12, "Program Files");
-    }
-
-    if (matchStr.length() <= 110 && printedMatches.find(matchStr) == printedMatches.end()) {
+    if (match.length() <= 110 && printedMatches.find(match) == printedMatches.end()) {
         if (outputChoice == 'C' || outputChoice == 'c') {
-            std::cout << "Executed file: " << matchStr << std::endl;
+            std::cout << "Executed file: " << match << std::endl;
         } else if (outputChoice == 'F' || outputChoice == 'f') {
-            (*output) << "Executed file: " << matchStr << std::endl;
+            (*output) << "Executed file: " << match << std::endl;
         }
-        printedMatches.insert(matchStr);
+        printedMatches.insert(match);
     }
 }
 
@@ -172,7 +165,7 @@ int main(int argc, char* argv[]) {
 
                 if (it != dataSubstring.end()) {
                     pos2 = pos1 + static_cast<size_t>(std::distance(dataSubstring.begin(), it));
-                    std::string_view match = dataSubstring.substr(8, pos2 - pos1 - 8 + 4);
+                    std::string match = data.substr(pos1 + 8, pos2 - pos1 - 8 + 4);
                     ProcessMatch(match, printedMatches, outputChoice, output);
                 }
             }
@@ -187,7 +180,7 @@ int main(int argc, char* argv[]) {
 
                 if (it != dataSubstring.end()) {
                     pos2 = pos1 + static_cast<size_t>(std::distance(dataSubstring.begin(), it));
-                    std::string_view match = dataSubstring.substr(12, pos2 - pos1 - 12 + 4);
+                    std::string match = data.substr(pos1 + 12, pos2 - pos1 - 12 + 4);
                     ProcessMatch(match, printedMatches, outputChoice, output);
                 }
             }
@@ -202,7 +195,7 @@ int main(int argc, char* argv[]) {
 
                 if (it != dataSubstring.end()) {
                     pos2 = pos1 + static_cast<size_t>(std::distance(dataSubstring.begin(), it));
-                    std::string_view match = dataSubstring.substr(12, pos2 - pos1 - 12 + 4);
+                    std::string match = data.substr(pos1 + 12, pos2 - pos1 - 12 + 4);
                     ProcessMatch(match, printedMatches, outputChoice, output);
                 }
             }
