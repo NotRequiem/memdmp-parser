@@ -10,7 +10,6 @@
 
 constexpr size_t CHUNK_SIZE = 330;
 
-// Precomputed toLower table
 std::array<char, 256> toLowerTable;
 
 void InitializeToLowerTable() {
@@ -19,7 +18,6 @@ void InitializeToLowerTable() {
     }
 }
 
-// Function to convert characters to lowercase using the table
 char ToLower(char c) {
     return toLowerTable[static_cast<unsigned char>(c)];
 }
@@ -57,6 +55,42 @@ void ProcessResults(std::string& str) {
     }
 }
 
+void ProcessMatch(std::string& match, std::unordered_set<std::string>& printedMatches, char outputChoice, std::unique_ptr<std::ostream>& output) {
+    if (match.find("HarddiskVolume") != std::string::npos) {
+        size_t volumePos = match.find("\\\\Device");
+        if (volumePos != std::string::npos) {
+            char driveLetter = 'A' + match[volumePos + 24] - '1';
+            std::string driveLetterStr(1, driveLetter);
+            match.replace(volumePos, 25, driveLetterStr + ":");
+        }
+    }
+
+    size_t doubleBackslashPos = match.find("\\\\");
+    while (doubleBackslashPos != std::string::npos) {
+        match.replace(doubleBackslashPos, 2, "\\");
+        doubleBackslashPos = match.find("\\\\", doubleBackslashPos + 1);
+    }
+
+    if (match.find("ProgramFiles(x86)") != std::string::npos) {
+        size_t pos = match.find("ProgramFiles(x86)");
+        match.replace(pos, 17, "Program Files (x86)");
+    } else if (match.find("ProgramFiles") != std::string::npos) {
+        size_t pos = match.find("ProgramFiles");
+        match.replace(pos, 12, "Program Files");
+    }
+
+    ProcessResults(match);
+
+    if (match.length() <= 110 && printedMatches.find(match) == printedMatches.end()) {
+        if (outputChoice == 'C' || outputChoice == 'c') {
+            std::cout << "Executed file: " << match << std::endl;
+        } else if (outputChoice == 'F' || outputChoice == 'f') {
+            (*output) << "Executed file: " << match << std::endl;
+        }
+        printedMatches.insert(match);
+    }
+}
+
 int main(int argc, char* argv[]) {
     InitializeToLowerTable();
 
@@ -69,7 +103,7 @@ int main(int argc, char* argv[]) {
     if (argc == 2) {
         filename = argv[1];
     } else {
-        std::cout << "Enter the file path of your memory image (e.g., D:\\Downloads\\memdump.mem): ";
+        std::cout << "Enter the file path of your memory image (Example: D:\\Downloads\\memdump.mem): ";
         std::getline(std::cin, filename);
     }
 
@@ -92,7 +126,7 @@ int main(int argc, char* argv[]) {
     std::ifstream file(filename, std::ios::binary);
 
     if (!file.is_open()) {
-        std::cerr << "File open failed" << std::endl;
+        std::cerr << "Failed to open the file, probably because it is already opened by another application or you provided a wrong path." << std::endl;
         return 1;
     }
 
@@ -129,24 +163,7 @@ int main(int argc, char* argv[]) {
                 if (it != dataSubstring.end()) {
                     pos2 = pos1 + static_cast<size_t>(std::distance(dataSubstring.begin(), it));
                     std::string match = data.substr(pos1 + 8, pos2 - pos1 - 8 + 4);
-                    ProcessResults(match);
-
-                    if (match.find("ProgramFiles(x86)") != std::string::npos) {
-                        size_t pos = match.find("ProgramFiles(x86)");
-                        match.replace(pos, 17, "Program Files (x86)");
-                    } else if (match.find("ProgramFiles") != std::string::npos) {
-                        size_t pos = match.find("ProgramFiles");
-                        match.replace(pos, 12, "Program Files");
-                    }
-
-                    if (match.length() <= 110 && printedMatches.find(match) == printedMatches.end()) {
-                        if (outputChoice == 'C' || outputChoice == 'c') {
-                            std::cout << "Executed file: " << match << std::endl;
-                        } else if (outputChoice == 'F' || outputChoice == 'f') {
-                            (*output) << "Executed file: " << match << std::endl;
-                        }
-                        printedMatches.insert(match);
-                    }
+                    ProcessMatch(match, printedMatches, outputChoice, output);
                 }
             }
 
@@ -161,30 +178,22 @@ int main(int argc, char* argv[]) {
                 if (it != dataSubstring.end()) {
                     pos2 = pos1 + static_cast<size_t>(std::distance(dataSubstring.begin(), it));
                     std::string match = data.substr(pos1 + 12, pos2 - pos1 - 12 + 4);
+                    ProcessMatch(match, printedMatches, outputChoice, output);
+                }
+            }
 
-                    if (match.find("HarddiskVolume") != std::string::npos) {
-                        size_t volumePos = match.find("\\\\Device");
-                        if (volumePos != std::string::npos) {
-                            char driveLetter = 'A' + match[volumePos + 24] - '1';
-                            std::string driveLetterStr(1, driveLetter);
-                            match.replace(volumePos, 25, driveLetterStr + ":");
-                        }
-                    }
+            pos1 = data.find("AppPath");
+            if (pos1 != std::string::npos) {
+                auto dataSubstring = data.substr(pos1);
+                auto it = std::search(dataSubstring.begin(), dataSubstring.end(), ".exe", ".exe" + 4,
+                    [](char a, char b) {
+                        return ToLower(a) == ToLower(b);
+                    });
 
-                    size_t doubleBackslashPos = match.find("\\\\");
-                    while (doubleBackslashPos != std::string::npos) {
-                        match.replace(doubleBackslashPos, 2, "\\");
-                        doubleBackslashPos = match.find("\\\\", doubleBackslashPos + 1);
-                    }
-
-                    if (match.length() <= 110 && printedMatches.find(match) == printedMatches.end()) {
-                        if (outputChoice == 'C' or outputChoice == 'c') {
-                            std::cout << "Executed file: " << match << std::endl;
-                        } else if (outputChoice == 'F' or outputChoice == 'f') {
-                            (*output) << "Executed file: " << match << std::endl;
-                        }
-                        printedMatches.insert(match);
-                    }
+                if (it != dataSubstring.end()) {
+                    pos2 = pos1 + static_cast<size_t>(std::distance(dataSubstring.begin(), it));
+                    std::string match = data.substr(pos1 + 12, pos2 - pos1 - 12 + 4);
+                    ProcessMatch(match, printedMatches, outputChoice, output);
                 }
             }
 
