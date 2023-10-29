@@ -8,7 +8,7 @@
 #include <algorithm>
 #include <limits>
 
-constexpr size_t CHUNK_SIZE = 4096;
+constexpr size_t CHUNK_SIZE = 330;
 
 // Precomputed toLower table
 std::array<char, 256> toLowerTable;
@@ -188,7 +188,7 @@ int main(int argc, char* argv[]) {
                 }
             }
 
-            overlapData = data.substr(data.size() - 1645);
+            overlapData = data.substr(data.size() - 220);
         } else {
             done = true;
         }
