@@ -59,20 +59,20 @@ void ProcessResults(std::string& str) {
 }
 
 void ProcessMatch(std::string& match, std::unordered_set<std::string>& printedMatches, char outputChoice, std::unique_ptr<std::ostream>& output) {
-        if (match.find("HarddiskVolume") != std::string::npos) {
-            size_t volumePos = match.find("\\\\Device");
-            if (volumePos != std::string::npos) {
-                char driveLetter = 'A' + match[volumePos + 24] - '1';
-                std::string driveLetterStr(1, driveLetter);
-                match.replace(volumePos, 25, driveLetterStr + ":");
-            }
+    if (match.find("HarddiskVolume") != std::string::npos) {
+        size_t volumePos = match.find("\\\\Device");
+        if (volumePos != std::string::npos) {
+            char driveLetter = 'A' + match[volumePos + 24] - '1';
+            std::string driveLetterStr(1, driveLetter);
+            match.replace(volumePos, 25, driveLetterStr + ":");
         }
+    }
 
-        size_t doubleBackslashPos = match.find("\\\\");
-        while (doubleBackslashPos != std::string::npos) {
-            match.replace(doubleBackslashPos, 2, "\\");
-            doubleBackslashPos = match.find("\\\\", doubleBackslashPos + 1);
-        }
+    size_t doubleBackslashPos = match.find("\\\\");
+    while (doubleBackslashPos != std::string::npos) {
+        match.replace(doubleBackslashPos, 2, "\\");
+        doubleBackslashPos = match.find("\\\\", doubleBackslashPos + 1);
+    }
 
     ProcessResults(match);
 
@@ -103,7 +103,7 @@ int main(int argc, char* argv[]) {
     std::unordered_set<std::string> printedMatches;
     std::unique_ptr<std::ostream> output;
 
-    if (argc == 2) {
+    if (argc > 1) {
         filename = argv[1];
     } else {
         std::cout << "Enter the file path of your memory image (Example: D:\\Downloads\\memdump.mem): ";
