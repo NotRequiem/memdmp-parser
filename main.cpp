@@ -126,7 +126,7 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    std::ifstream file(filename, std::ios::binary);
+    std::ifstream file(filename, std::ios::binary | std::ios::in);
 
     if (!file.is_open()) {
         std::cerr << "Failed to open the file, probably because it is already opened by another application or you provided a wrong path." << std::endl;
