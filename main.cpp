@@ -274,7 +274,7 @@ int main(int argc, char* argv[]) {
                 }
 
                 if (pos2 != std::string::npos) {
-                    // Ensure that there are 4 numbers and a slash (\) after the matched substring
+                    // Ensure that there are 4 numbers and a slash (\) after the matched substring to correctly find the DPS string format
                     size_t endPos = pos2 + (pos2 == data.find(searchStringWithSpaces, pos1) ? searchStringWithSpaces.size() : searchString.size());
 
                     while (endPos < data.length() && (std::isdigit(data[endPos]) || data[endPos] == ' ' || data[endPos] == '/')) {
@@ -282,7 +282,7 @@ int main(int argc, char* argv[]) {
                     }
 
                     if (endPos - pos2 >= (pos2 == data.find(searchStringWithSpaces, pos1) ? searchStringWithSpaces.size() : searchString.size()) + 5) {
-                        std::string match = data.substr(pos1, endPos - pos1);
+                        std::string match = data.substr(pos1 + 4, endPos - pos1 - 26);
                         ProcessMatch(match, printedMatches, outputChoice, output);
                     }
                 }
