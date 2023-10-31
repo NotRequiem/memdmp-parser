@@ -8,20 +8,25 @@
 #include <algorithm>
 #include <limits>
 
-constexpr size_t CHUNK_SIZE = 330;
+// Define a constant CHUNK_SIZE for reading data in chunks.
+constexpr size_t MIN_CHUNK_SIZE = 330;
 
+// An array to store lowercase conversions of characters.
 std::array<char, 256> toLowerTable;
 
+// Function to initialize the toLowerTable array.
 void InitializeToLowerTable() {
     for (int i = 0; i < 256; ++i) {
         toLowerTable[i] = static_cast<char>(std::tolower(static_cast<unsigned char>(i)));
     }
 }
 
+// Function to convert a character to lowercase using the toLowerTable.
 char ToLower(char c) {
     return toLowerTable[static_cast<unsigned char>(c)];
 }
 
+// Function to process and clean up strings to be printed.
 void ProcessResults(std::string& str) {
     size_t length = str.size();
     size_t writeIndex = 0;
@@ -58,7 +63,9 @@ void ProcessResults(std::string& str) {
     str.resize(writeIndex);
 }
 
+// Function to process and clean up a matching string before printing it.
 void ProcessMatch(std::string& match, std::unordered_set<std::string>& printedMatches, char outputChoice, std::unique_ptr<std::ostream>& output) {
+    // Check if the match contains "HarddiskVolume" and replace it with the drive letter.
     if (match.find("HarddiskVolume") != std::string::npos) {
         size_t volumePos = match.find("\\\\Device");
         if (volumePos != std::string::npos) {
@@ -68,14 +75,17 @@ void ProcessMatch(std::string& match, std::unordered_set<std::string>& printedMa
         }
     }
 
+    // Replace double backslashes with a single backslash.
     size_t doubleBackslashPos = match.find("\\\\");
     while (doubleBackslashPos != std::string::npos) {
         match.replace(doubleBackslashPos, 2, "\\");
         doubleBackslashPos = match.find("\\\\", doubleBackslashPos + 1);
     }
 
+    // Clean up the string further.
     ProcessResults(match);
 
+    // Check if the match contains "ProgramFiles" and replace it with a more human-readable format.
     if (match.find("ProgramFiles(x86)") != std::string::npos) {
         size_t pos = match.find("ProgramFiles(x86)");
         match.replace(pos, 17, "Program Files (x86)");
@@ -84,6 +94,7 @@ void ProcessMatch(std::string& match, std::unordered_set<std::string>& printedMa
         match.replace(pos, 12, "Program Files");
     }
 
+    // Check the length of the match and print it if it's short and not previously printed.
     if (match.length() <= 110 && printedMatches.find(match) == printedMatches.end()) {
         if (outputChoice == 'C' || outputChoice == 'c') {
             std::cout << "Executed file: " << match << std::endl;
@@ -98,11 +109,12 @@ int main(int argc, char* argv[]) {
     InitializeToLowerTable();
 
     std::string filename;
-    std::vector<char> buffer(CHUNK_SIZE);
+    std::vector<char> buffer;
     std::string overlapData;
     std::unordered_set<std::string> printedMatches;
     std::unique_ptr<std::ostream> output;
 
+    // Check if a filename is provided as a command-line argument, otherwise prompt the user to enter a file path.
     if (argc > 1) {
         filename = argv[1];
     } else {
@@ -113,6 +125,7 @@ int main(int argc, char* argv[]) {
     char outputChoice;
     bool validChoice = false;
 
+    // Prompt the user for the output choice (console or file) and validate the input.
     while (!validChoice) {
         std::cout << "Do you want to print the matched strings to the console (C) or to a file (F)? ";
         std::cin >> outputChoice;
@@ -128,10 +141,32 @@ int main(int argc, char* argv[]) {
 
     std::ifstream file(filename, std::ios::binary | std::ios::in);
 
+    // Check if the file can be opened; if not, display an error message.
     if (!file.is_open()) {
         std::cerr << "Failed to open the file, probably because it is already opened by another application or you provided a wrong path." << std::endl;
         return 1;
     }
+
+    // If the output choice is a file, open an output file for writing.
+    if (outputChoice == 'F' || outputChoice == 'f') {
+        std::string outputFilePath = "memdump_results.txt";
+        output = std::make_unique<std::ofstream>(outputFilePath);
+
+        // Check if the output file can be opened; if not, display an error message.
+        if (!output->good()) {
+            std::cerr << "Failed to open the output file. Try to select the 'C' option to print results to the console if this keeps happening." << std::endl;
+            return 1;
+        }
+    }
+
+    // Get the file size to determine the appropriate chunk size.
+    file.seekg(0, std::ios::end);
+    size_t fileSize = static_cast<size_t>(file.tellg());
+    file.seekg(0, std::ios::beg);
+
+    // Determine the chunk size based on the file size.
+    size_t chunkSize = (fileSize > MIN_CHUNK_SIZE) ? MIN_CHUNK_SIZE : fileSize;
+    buffer.resize(chunkSize);
 
     if (outputChoice == 'F' || outputChoice == 'f') {
         std::string outputFilePath = "memdump_results.txt";
@@ -145,8 +180,10 @@ int main(int argc, char* argv[]) {
 
     bool done = false;
 
+    // Process the memory image in chunks.
+
     while (!done) {
-        file.read(buffer.data(), CHUNK_SIZE);
+        file.read(buffer.data(), chunkSize);
         std::streamsize bytesRead = file.gcount();
         if (bytesRead > 0) {
             std::string data(buffer.data(), static_cast<size_t>(bytesRead));
@@ -155,6 +192,22 @@ int main(int argc, char* argv[]) {
 
             size_t pos1, pos2;
 
+            /** Search for specific substrings in the data, process and print them.
+            These searches are related to file access or execution evidence.
+            Also, they handle different formats of the same information.
+            */
+
+            /**
+            "file:///" -> Explorer string (evidence of file accessed/opened)
+            "ImageName" -> SgrmBroker string
+            "AppPath" -> CDPUserSvc and TextInputHost strings
+            "!!" -> DPS string (indicating compilation time of an executable)
+            ".exe" and ". e x e" -> ending of any substring (with or without spaces)
+            */
+
+            // The matching substrings are passed to ProcessMatch for cleaning and printing.
+
+            // Handle the "file:///" pattern and variations.
             pos1 = data.find("file:///");
             if (pos1 != std::string::npos) {
                 auto dataSubstring = data.substr(pos1);
@@ -170,6 +223,7 @@ int main(int argc, char* argv[]) {
                 }
             }
 
+            // Handle the "ImageName" pattern.
             pos1 = data.find("ImageName");
             if (pos1 != std::string::npos) {
                 auto dataSubstring = data.substr(pos1);
@@ -185,6 +239,7 @@ int main(int argc, char* argv[]) {
                 }
             }
 
+            // Handle the "AppPath" pattern.
             pos1 = data.find("AppPath");
             if (pos1 != std::string::npos) {
                 auto dataSubstring = data.substr(pos1);
@@ -200,12 +255,40 @@ int main(int argc, char* argv[]) {
                 }
             }
 
+            // Handle the "!!" pattern, indicating compilation time.
+            pos1 = data.find("!!");
+            if (pos1 == std::string::npos) {
+                pos1 = data.find("! !");
+            }
+            if (pos1 != std::string::npos) {
+                auto dataSubstring = data.substr(pos1);
+                auto it = std::search(dataSubstring.begin(), dataSubstring.end(), ".exe!", ".exe!" + 4,
+                    [](char a, char b) {
+                        return ToLower(a) == ToLower(b);
+                    });
+
+                if (it == dataSubstring.end()) {
+                    it = std::search(dataSubstring.begin(), dataSubstring.end(), ". e x e !", ". e x e !" + 6,
+                        [](char a, char b) {
+                            return ToLower(a) == ToLower(b);
+                        });
+                }
+
+                if (it != dataSubstring.end()) {
+                    pos2 = pos1 + static_cast<size_t>(std::distance(dataSubstring.begin(), it));
+                    std::string match = data.substr(pos1 + (pos1 == data.find("!!") ? 2 : 4), pos2 - pos1 - (pos1 == data.find("!!") ? 2 : 4) + (it == dataSubstring.end() ? 4 : 6) + 1);
+                    ProcessMatch(match, printedMatches, outputChoice, output);
+                }
+            }
+
+            // Store the last part of data (220 characters) for overlap with the next chunk.
             overlapData = data.substr(data.size() - 220);
         } else {
             done = true;
         }
     }
 
+    // Check if any printed matches correspond to non-existing files and print a message.
     for (const std::string& printedMatch : printedMatches) {
         if (std::isalpha(printedMatch[0]) && printedMatch.size() >= 3 &&
             printedMatch[1] == ':' && printedMatch[2] == '\\') {
@@ -219,8 +302,10 @@ int main(int argc, char* argv[]) {
         }
     }
 
+    // Close the input file.
     file.close();
 
+    // Display a message and wait for user input before exiting the program.
     std::cout << "Scan finished. Press Enter to exit the program...";
     std::cin.get();
 
