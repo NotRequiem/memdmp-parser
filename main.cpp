@@ -274,15 +274,12 @@ int main(int argc, char* argv[]) {
                 }
 
                 if (pos2 != std::string::npos) {
-                    // Ensure that there are 4 numbers and a slash (\) after the matched substring to correctly find the DPS string format
-                    size_t endPos = pos2 + (pos2 == data.find(searchStringWithSpaces, pos1) ? searchStringWithSpaces.size() : searchString.size());
+                    // Calculate the start and end positions of the match
+                    size_t start = (pos1 == data.find("!!") ? (pos1 + 2) : (pos1 + 4));
+                    size_t endPos = pos2 + ((pos2 == data.find(searchStringWithSpaces, pos1)) ? 7 : 4);
 
-                    while (endPos < data.length() && (std::isdigit(data[endPos]) || data[endPos] == ' ' || data[endPos] == '/')) {
-                        ++endPos;
-                    }
-
-                    if (endPos - pos2 >= (pos2 == data.find(searchStringWithSpaces, pos1) ? searchStringWithSpaces.size() : searchString.size()) + 5) {
-                        std::string match = data.substr(pos1 + 4, endPos - pos1 - 26);
+                    if (endPos - start >= ((pos2 == data.find(searchStringWithSpaces, pos1)) ? 7 : 4)) {
+                        std::string match = data.substr(start, endPos - start);
                         ProcessMatch(match, printedMatches, outputChoice, output);
                     }
                 }
