@@ -23,7 +23,7 @@ Before using this tool, ensure that you have the following:
   1. Any Windows Server version
   2. Windows 7 or above.
      
-- If you dont have MSYS2 installed (GCC), the following dll files (attached in the "releases" section) near memparser.exe
+- If you dont have MSYS2 installed (GCC), put the following dll files (attached in the "Releases" section of this repository) near memparser.exe
   
   1. libgcc_s_seh-1.dll
   2. libstdc++-6.dll
@@ -35,12 +35,12 @@ The program does not need administrator privileges or network connection to run.
 
 1. Run the Program:
 
-- Execute the compiled binary, providing the memory image file as an argument.
+- Execute the compiled binary (located in the "Releases" section of this repository), providing the memory image file as an argument.
 
 Example:
 memparser.exe C:\Users\PC\Downloads\memdump.mem
 
-- You can also drag your memory dump to the program to start analyzing it.
+- You can also drag your memory dump into the program to start analyzing it.
 - If you run the program without arguments, the program will ask you for a path to the memory image file that you want to analyze.
 
 2. Output Choices:
@@ -52,7 +52,7 @@ memparser.exe C:\Users\PC\Downloads\memdump.mem
 
 3. View Results:
 
-- The tool will analyze the memory image and display or save the matched strings, providing insights into executed and potentially deleted files.
+- The tool will analyze the memory dump and display or save the matched strings, providing insights into executed and potentially deleted files.
 
 ![imgresults](images/executed_files.png) 
 
