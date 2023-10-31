@@ -23,8 +23,12 @@ Before using this tool, ensure that you have the following:
   1. Any Windows Server version
   2. Windows 7 or above.
      
-- The following dll files (attached in the "releases" section) near memparser.exe
-
+- If you dont have MSYS2 installed (GCC), the following dll files (attached in the "releases" section) near memparser.exe
+  
+  1. libgcc_s_seh-1.dll
+  2. libstdc++-6.dll
+  3. libwinpthread-1.dll
+     
 The program does not need administrator privileges or network connection to run.
 
 ## Usage
