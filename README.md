@@ -19,8 +19,10 @@ Before using this tool, ensure that you have the following:
 
 - A RAM memory dump file for analysis. The program supports every memory image file extension (such as .raw, .mem, .img) and txt.
 - A Windows environment to run the executable:
-  Any Windows Server version
-  Windows 7 or above.
+  
+  1. Any Windows Server version
+  2. Windows 7 or above.
+     
 - The following dll files (attached in the "releases" section) near memparser.exe
 
 The program does not need administrator privileges or network connection to run.
@@ -30,8 +32,9 @@ The program does not need administrator privileges or network connection to run.
 1. Run the Program:
 
 - Execute the compiled binary, providing the memory image file as an argument.
+
 Example:
-    memparser.exe C:\Users\PC\Downloads\memdump.mem
+memparser.exe C:\Users\PC\Downloads\memdump.mem
 
 - You can also drag your memory dump to the program to start analyzing it.
 - If you run the program without arguments, the program will ask you for a path to the memory image file that you want to analyze.
