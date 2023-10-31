@@ -258,39 +258,35 @@ int main(int argc, char* argv[]) {
             // Handle the "!!" pattern, indicating compilation time.
             pos1 = data.find("!!");
             if (pos1 == std::string::npos) {
+                // If "!!" is not found, try searching for "! !"
                 pos1 = data.find("! !");
             }
 
             if (pos1 != std::string::npos) {
-            auto dataSubstring = data.substr(pos1);
+                std::string searchString = ".exe!";
+                std::string searchStringWithSpaces = ". e x e !";
+                size_t pos2 = pos1;
 
-            auto it = std::search(dataSubstring.begin(), dataSubstring.end(), ".exe!", ".exe!" + 4,
-                [](char a, char b) {
-                    return ToLower(a) == ToLower(b);
-                });
+                // Find ".exe!" or ". e x e !" with spaces
+                pos2 = data.find(searchString, pos1);
+                if (pos2 == std::string::npos) {
+                    pos2 = data.find(searchStringWithSpaces, pos1);
+                }
 
-            if (it == dataSubstring.end()) {
-                it = std::search(dataSubstring.begin(), dataSubstring.end(), ". e x e !", ". e x e !" + 6,
-                    [](char a, char b) {
-                        return ToLower(a) == ToLower(b);
-                    });
-            }
+                if (pos2 != std::string::npos) {
+                    // Ensure that there are 4 numbers and a slash (\) after the matched substring
+                    size_t endPos = pos2 + (pos2 == data.find(searchStringWithSpaces, pos1) ? searchStringWithSpaces.size() : searchString.size());
 
-            if (it != dataSubstring.end()) {
-                // Calculate the position of the match
-                size_t pos2 = pos1 + std::distance(dataSubstring.begin(), it);
-                
-                // Extract the matched substring
-                std::string match = data.substr(pos2, 8);  // 4 numbers + ".exe!" + 1 (for the slash)
-                
-                // Check if the extracted match follows the desired format
-                if (match.size() == 8 && match.find(".exe!") == 4) {
-                    // Process the valid match
-                    ProcessMatch(match, printedMatches, outputChoice, output);
+                    while (endPos < data.length() && (std::isdigit(data[endPos]) || data[endPos] == ' ' || data[endPos] == '/')) {
+                        ++endPos;
+                    }
+
+                    if (endPos - pos2 >= (pos2 == data.find(searchStringWithSpaces, pos1) ? searchStringWithSpaces.size() : searchString.size()) + 5) {
+                        std::string match = data.substr(pos1, endPos - pos1);
+                        ProcessMatch(match, printedMatches, outputChoice, output);
+                    }
                 }
             }
-        }
-
             // Store the last part of data (220 characters) for overlap with the next chunk.
             overlapData = data.substr(data.size() - 220);
         } else {
