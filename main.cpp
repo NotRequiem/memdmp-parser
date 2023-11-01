@@ -120,13 +120,13 @@ void ProcessMatchingString(std::string& match, std::unordered_set<std::string>& 
         printedMatches.insert(lowercaseMatch);
 
         // Print the original match in the desired output.
-        if (outputChoice == 'C' || outputChoice == 'c') { // Print to console
+        if (outputChoice == 'C' || outputChoice == 'c') {
             SET_TEXT_COLOR_BLUE(); // Set text color to blue
             std::cout << "Executed file: ";
             RESET_TEXT_COLOR(); // Reset text color
             std::cout << match << std::endl;
-        } else if (outputChoice == 'F' || outputChoice == 'f') { // Print to file
-            (*output) << "Executed file: " << match << std::endl; 
+        } else if (outputChoice == 'F' || outputChoice == 'f') {
+            (*output) << "Executed file: " << match << std::endl;
         }
     }
 }
@@ -237,37 +237,30 @@ int main(int argc, char* argv[]) {
 
             // Search for occurrences of "file:///" pattern in the input data.
             pos1 = data.find("file:///");
-            pos2 = std::string::npos;
 
-                // If the pattern "file:///" is found in the data string.
-                if (pos1 != std::string::npos) {
-                    //  Check if the character following "file:///" is a letter, followed by a colon, and followed by a slash, in this order.
-                    if (data.length() > pos1 + 10 && isalpha(data[pos1 + 9]) && data[pos1 + 10] == ':' && data[pos1 + 11] == '/') {
-                        // Extract a substring starting from the position of the pattern.
-                        auto dataSubstring = data.substr(pos1);
-                        // Search for the ".exe" pattern within the extracted substring.
-                        auto it = std::search(dataSubstring.begin(), dataSubstring.end(), ".exe", ".exe" + 4,
-                            [](char a, char b) {
-                                return tolower(a) == tolower(b); // Case-insensitive comparison.
-                            });
+            // If the pattern is found in the data string.
+            if (pos1 != std::string::npos) {
+                // Extract a substring starting from the position of the pattern.
+                auto dataSubstring = data.substr(pos1);
 
-                        // If ".exe" is found within the substring.
-                        if (it != dataSubstring.end()) {
-                            // Calculate the end position of the matched substring.
-                            pos2 = pos1 + static_cast<size_t>(std::distance(dataSubstring.begin(), it));
+                // Search for the ".exe" pattern within the extracted substring.
+                auto it = std::search(dataSubstring.begin(), dataSubstring.end(), ".exe", ".exe" + 4,
+                    [](char a, char b) {
+                        return ConvertToLowercase(a) == ConvertToLowercase(b);
+                    });
 
-                            // Extract the matched string, including "file:///" and the ".exe" extension.
-                            std::string match = data.substr(pos1 + 8, pos2 - pos1 - 8 + 4);
+                // If ".exe" is found within the substring.
+                if (it != dataSubstring.end()) {
+                    // Calculate the end position of the matched substring.
+                    pos2 = pos1 + static_cast<size_t>(std::distance(dataSubstring.begin(), it));
 
-                            // Process the matching string using a function named ProcessMatchingString.
-                            ProcessMatchingString(match, printedMatches, outputChoice, output);
-                        }
-                    }
+                    // Extract the matched string, removing "file:///" and including the ".exe" extension.
+                    std::string match = data.substr(pos1 + 8, pos2 - pos1 - 8 + 4);
+
+                    // Process the matching string using a function named ProcessMatchingString.
+                    ProcessMatchingString(match, printedMatches, outputChoice, output);
                 }
-
-// The same process is repeated for two more patterns: "ImageName" and "AppPath".
-// The code checks for the existence of these patterns in the data string and processes
-// the matching substrings in a similar manner as described above.
+            }
 
             // Handle the "ImageName" pattern.
             pos1 = data.find("ImageName");
@@ -301,31 +294,61 @@ int main(int argc, char* argv[]) {
                 }
             }
 
-            // Handle the "!!" pattern, indicating compilation time.
+            // Search for "!!" in the input string, if not found, search for "! !"
             pos1 = data.find("!!");
             if (pos1 == std::string::npos) {
-                // If "!!" is not found, try searching for "! !"
                 pos1 = data.find("! !");
             }
 
+            // If "!!" or "! !" is found in the input data
             if (pos1 != std::string::npos) {
-                std::string searchstring = ".exe!";
-                std::string searchstringWithSpaces = ". e x e !";
+                std::string searchString = ".exe!";
+                std::string searchStringWithSpaces = ". e x e !";
                 size_t pos2 = pos1;
 
-                // Find ".exe!" or ". e x e !" with spaces
-                pos2 = data.find(searchstring, pos1);
+                // Search for ".exe!" or ". e x e !" with spaces
+                pos2 = data.find(searchString, pos1);
                 if (pos2 == std::string::npos) {
-                    pos2 = data.find(searchstringWithSpaces, pos1);
+                    pos2 = data.find(searchStringWithSpaces, pos1);
                 }
 
+                // If ".exe!" or ". e x e !" is found
                 if (pos2 != std::string::npos) {
                     // Calculate the start and end positions of the match
                     size_t start = (pos1 == data.find("!!") ? (pos1 + 2) : (pos1 + 4));
-                    size_t endPos = pos2 + ((pos2 == data.find(searchstringWithSpaces, pos1)) ? 7 : 4);
+                    size_t endPos = pos2 + ((pos2 == data.find(searchStringWithSpaces, pos1)) ? 7 : 4);
 
-                    if (endPos - start >= ((pos2 == data.find(searchstringWithSpaces, pos1)) ? 7 : 4)) {
+                    // Check if there are 4 digits followed by a slash after the "!" character at endPos
+                    bool hasFourNumbersAndSlash = false;
+                    if (endPos < data.length() - 5) {
+                        char c1, c2, c3, c4, c5;
+
+                        if (pos2 == data.find(searchStringWithSpaces, pos1)) {
+                            // If ". e x e !" was found, use these positions to skip spaces between characters
+                            c1 = data[endPos + 2];
+                            c2 = data[endPos + 4];
+                            c3 = data[endPos + 6];
+                            c4 = data[endPos + 8];
+                            c5 = data[endPos + 10];
+                        } else {
+                            // If ".exe!" was found, use normal positions since there are no spaces to skip
+                            c1 = data[endPos + 1];
+                            c2 = data[endPos + 2];
+                            c3 = data[endPos + 3];
+                            c4 = data[endPos + 4];
+                            c5 = data[endPos + 5];
+                        }
+
+                        // Check if the characters at these positions are digits and the last character is a slash
+                        if (isdigit(c1) && isdigit(c2) && isdigit(c3) && isdigit(c4) && c5 == '/') {
+                            hasFourNumbersAndSlash = true;
+                        }
+                    }
+
+                    // If the pattern is matched:
+                    if (hasFourNumbersAndSlash) {
                         std::string match = data.substr(start, endPos - start);
+                        // Process the matching string
                         ProcessMatchingString(match, printedMatches, outputChoice, output);
                     }
                 }
