@@ -15,19 +15,12 @@ constexpr size_t MIN_CHUNK_SIZE = 330;
 // An array to store lowercase conversions of characters.
 std::array<char, 256> lowercaseConversionTable;
 
-/** Platform-independent text color macros
- * This code defines platform-independent macros to set the text color based on the platform you are running the program on. 
- * It uses Windows Console API on Windows and ANSI escape codes on non-Windows platforms.
- */
- 
+// Text colors for better console output
 #ifdef _WIN32
 #define SET_TEXT_COLOR_RED() SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 12)
 #define SET_TEXT_COLOR_BLUE() SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 9)
+#define SET_TEXT_COLOR_GREEN() SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 10)
 #define RESET_TEXT_COLOR() SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 7)
-#else
-#define SET_TEXT_COLOR_RED() std::cout << "\033[31m"
-#define SET_TEXT_COLOR_BLUE() std::cout << "\033[34m"
-#define RESET_TEXT_COLOR() std::cout << "\033[0m"
 #endif
 
 // Function to initialize the lowercaseConversionTable array.
@@ -98,8 +91,6 @@ void ProcessMatchingString(std::string& match, std::unordered_set<std::string>& 
         doubleBackslashPos = match.find("\\\\", doubleBackslashPos + 1);
     }
 
-    // Clean up the string further.
-    CleanStringForPrinting(match);
 
     // Check if the match contains "ProgramFiles" and replace it with a more human-readable format.
     if (match.find("ProgramFiles(x86)") != std::string::npos) {
@@ -113,6 +104,29 @@ void ProcessMatchingString(std::string& match, std::unordered_set<std::string>& 
     // Convert the match to lowercase for case-insensitive comparison.
     std::string lowercaseMatch = match;
     std::transform(lowercaseMatch.begin(), lowercaseMatch.end(), lowercaseMatch.begin(), ::tolower);
+
+    if (match.find("file:///") != std::string::npos) {
+
+        // Remove "file:///" prefix (first 8 characters)
+        match = match.substr(8);
+        CleanStringForPrinting(match); // Clean up the string further.
+
+        if (printedMatches.find(lowercaseMatch) == printedMatches.end() && match.length() <= 110) {
+        printedMatches.insert(lowercaseMatch); // Insert the lowercase match into the set to keep track of it.
+
+            // Print the modified match in the desired output.
+            if (outputChoice == 'C' || outputChoice == 'c') {
+                SET_TEXT_COLOR_GREEN(); // Set text color to green
+                std::cout << "Accessed file: ";
+                RESET_TEXT_COLOR(); // Reset text color
+                std::cout << match << std::endl;
+            } else if (outputChoice == 'F' || outputChoice == 'f') {
+                (*output) << "Accessed file: " << match << std::endl;
+            }
+        }
+    }
+
+    CleanStringForPrinting(match); // Clean up the string further.
 
     // Check if the lowercase match has not been previously printed and meets the length condition.
     if (printedMatches.find(lowercaseMatch) == printedMatches.end() && match.length() <= 110) {
@@ -258,8 +272,8 @@ int main(int argc, char* argv[]) {
                             // Calculate the end position of the matched substring.
                             pos2 = pos1 + static_cast<size_t>(std::distance(dataSubstring.begin(), it));
 
-                            // Extract the matched string, removing "file:///" and including the ".exe" extension.
-                            std::string match = data.substr(pos1 + 8, pos2 - pos1 - 8 + 4);
+                            // Extract the matched string, including "file:///" and the ".exe" extension.
+                            std::string match = data.substr(pos1, pos2 - pos1 + 4);
 
                             // Process the matching string using a function named ProcessMatchingString.
                             ProcessMatchingString(match, printedMatches, outputChoice, output);
