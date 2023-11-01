@@ -91,7 +91,7 @@ void CleanStringForPrinting(std::string& inputString) {
     inputString.resize(writeIndex);
 }
 
-// Function to process and clean up a matching string before printing it
+// Function to process the memory image file
 void ProcessMatchingString(std::string& match, std::unordered_set<std::string>& printedMatches, char outputChoice, std::unique_ptr<std::ostream>& output) {
     // Check if the match contains "HarddiskVolume" and replace it with the drive letter
     if (match.find("HarddiskVolume") != std::string::npos) {
@@ -160,7 +160,7 @@ void ProcessMatchingString(std::string& match, std::unordered_set<std::string>& 
         match = match.substr(8);
         CleanStringForPrinting(match); // Clean up the string further
 
-        if (printedMatches.find(lowercaseMatch) == printedMatches.end() && match.length() <= 110) {
+        if (printedMatches.find(lowercaseMatch) == printedMatches.end() && match.length() <= 110 && match.length() > 4) {
         printedMatches.insert(lowercaseMatch); // Insert the lowercase match into the set to keep track of it
 
             // Print the modified match in the desired output.
@@ -178,7 +178,7 @@ void ProcessMatchingString(std::string& match, std::unordered_set<std::string>& 
     CleanStringForPrinting(match); // Clean up the string further
 
     // Check if the lowercase match has not been previously printed and meets the length condition
-    if (printedMatches.find(lowercaseMatch) == printedMatches.end() && match.length() <= 110) {
+    if (printedMatches.find(lowercaseMatch) == printedMatches.end() && match.length() <= 110 && match.length() > 4) {
         // Insert the lowercase match into the set to keep track of it
         printedMatches.insert(lowercaseMatch);
 
@@ -350,16 +350,21 @@ int main(int argc, char* argv[]) {
             // Handle the "AppPath" pattern
             pos1 = data.find("\"AppPath\":\"");
             if (pos1 != std::string::npos) {
+                pos1 += 10; // Move past "AppPath":"
                 auto dataSubstring = data.substr(pos1);
-                auto it = std::search(dataSubstring.begin(), dataSubstring.end(), ".exe", ".exe" + 4,
-                    [](char a, char b) {
-                        return ConvertToLowercase(a) == ConvertToLowercase(b);
-                    });
 
-                if (it != dataSubstring.end()) {
-                    pos2 = pos1 + static_cast<size_t>(std::distance(dataSubstring.begin(), it));
-                    std::string match = data.substr(pos1 + 12, pos2 - pos1 - 12 + 4);
-                    ProcessMatchingString(match, printedMatches, outputChoice, output);
+                // Check if the first character in dataSubstring is an alphabetic character
+                if (dataSubstring.size() > 0 && std::isalpha(dataSubstring[0])) {
+                    auto it = std::search(dataSubstring.begin(), dataSubstring.end(), ".exe", ".exe" + 4,
+                        [](char a, char b) {
+                            return ConvertToLowercase(a) == ConvertToLowercase(b);
+                        });
+
+                    if (it != dataSubstring.end()) {
+                        pos2 = pos1 + static_cast<size_t>(std::distance(dataSubstring.begin(), it));
+                        std::string match = data.substr(pos1, pos2 - pos1 + 4);
+                        ProcessMatchingString(match, printedMatches, outputChoice, output);
+                    }
                 }
             }
 
@@ -387,37 +392,78 @@ int main(int argc, char* argv[]) {
                     size_t start = (pos1 == data.find("!!") ? (pos1 + 2) : (pos1 + 4));
                     size_t endPos = pos2 + ((pos2 == data.find(searchStringWithSpaces, pos1)) ? 7 : 4);
 
-                    // Check if there are 4 digits followed by a slash after ".exe!" or ". e x e !" to avoid false flags
-                    bool hasFourNumbersAndSlash = false;
-                    if (endPos < data.length() - 5) {
-                        char c1, c2, c3, c4, c5;
+                    /** 
+                     * 
+                     * This code block checks if a DPS string with a correct format was found to avoid false flagging corrupt data.
+                     * We will take !!svchost.exe!2092/10/12:19:58:29! as a example to explain this part of the code.
+                     * Each character is checked. For example, a DPS string will always have a digit in the first position after ".exe!" or ". e x e !".
+                     * We can analyze if at a certain bit of the string, there is a digit, a colon, a slash, etc... to check if a DPS string was found.
+                     * 
+                    */ 
+
+                    bool CorrectFormat = false;
+                    if (endPos < data.length() - 20) {
+                        char c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15, c16, c17, c18, c19, c20;
 
                         if (pos2 == data.find(searchStringWithSpaces, pos1)) {
-                            // If ". e x e !" was found, use these positions to skip spaces between characters
-                            c1 = data[endPos + 2];
-                            c2 = data[endPos + 4];
-                            c3 = data[endPos + 6];
-                            c4 = data[endPos + 8];
-                            c5 = data[endPos + 10];
+                            // If ". e x e !" was found, a DPS string with spaces between characters was found.
+                            // Therefore we will have to skip spaces between characters
+                            c1 = data[endPos + 2]; // 2
+                            c2 = data[endPos + 4]; // 0
+                            c3 = data[endPos + 6]; // 9
+                            c4 = data[endPos + 8]; // 2
+                            c5 = data[endPos + 10]; // /
+                            c6 = data[endPos + 12]; // 1
+                            c7 = data[endPos + 14]; // 0
+                            c8 = data[endPos + 16]; // / 
+                            c9 = data[endPos + 18]; // 1
+                            c10 = data[endPos + 20]; // 2
+                            c11 = data[endPos + 22]; // :
+                            c12 = data[endPos + 24]; // 1
+                            c13 = data[endPos + 26]; // 9
+                            c14 = data[endPos + 28]; // :
+                            c15 = data[endPos + 30]; // 5
+                            c16 = data[endPos + 32]; // 8
+                            c17 = data[endPos + 34]; // :
+                            c18 = data[endPos + 36]; // 2
+                            c19 = data[endPos + 38]; // 9
+                            c20 = data[endPos + 40]; // !
                         } else {
-                            // If ".exe!" was found, use normal positions since there are no spaces to skip
-                            c1 = data[endPos + 1];
-                            c2 = data[endPos + 2];
-                            c3 = data[endPos + 3];
-                            c4 = data[endPos + 4];
-                            c5 = data[endPos + 5];
+                            // If ".exe!" was found, we can use normal positions since there are no spaces between characters to skip
+                            c1 = data[endPos + 1]; // 2
+                            c2 = data[endPos + 2]; // 0
+                            c3 = data[endPos + 3]; // 9
+                            c4 = data[endPos + 4]; // 2
+                            c5 = data[endPos + 5]; // /
+                            c6 = data[endPos + 6]; // 1
+                            c7 = data[endPos + 7]; // 0
+                            c8 = data[endPos + 8]; // / 
+                            c9 = data[endPos + 9]; // 1
+                            c10 = data[endPos + 10]; // 2
+                            c11 = data[endPos + 11]; // :
+                            c12 = data[endPos + 12]; // 1
+                            c13 = data[endPos + 13]; // 9
+                            c14 = data[endPos + 14]; // :
+                            c15 = data[endPos + 15]; // 5
+                            c16 = data[endPos + 16]; // 8
+                            c17 = data[endPos + 17]; // :
+                            c18 = data[endPos + 18]; // 2
+                            c19 = data[endPos + 19]; // 9
+                            c20 = data[endPos + 20]; // !
                         }
-
                         // Check if the characters at these positions are digits and the last character is a slash
-                        if (isdigit(c1) && isdigit(c2) && isdigit(c3) && isdigit(c4) && c5 == '/') {
-                            hasFourNumbersAndSlash = true;
+                        if (isdigit(c1) && isdigit(c2) && isdigit(c3) && isdigit(c4) && c5 == '/' 
+                         && isdigit(c6) && isdigit(c7) && c8 == '/' && isdigit(c9) && isdigit(c10)
+                         && c11 == ':' && isdigit(c12) && isdigit(c13) && c14 == ':' && isdigit(c15)
+                         && isdigit(c16) && c17 == ':' & isdigit(c18) & isdigit(c19) & c20 == '!') {
+                         CorrectFormat = true;
                         }
                     }
 
-                    // If the pattern is matched:
-                    if (hasFourNumbersAndSlash) {
-                        std::string match = data.substr(start, endPos - start);
-                        // Process the matching string
+                    // If a DPS string format was found succesfully:
+                    if (CorrectFormat) {
+                        std::string match = data.substr(start, endPos - start); // We extract the executable name
+                        // We process the matching string
                         ProcessMatchingString(match, printedMatches, outputChoice, output);
                     }
                 }
