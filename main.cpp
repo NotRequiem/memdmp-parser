@@ -8,11 +8,12 @@
 #include <vector>
 #include <algorithm>
 #include <limits>
+#include <map>
 
-// Define a constant CHUNK_SIZE for reading data in chunks (resulting in a faster data processing).
+// Define a constant CHUNK_SIZE for reading data in chunks (resulting in a faster data processing)
 constexpr size_t MIN_CHUNK_SIZE = 330;
 
-// An array to store lowercase conversions of characters.
+// An array to store lowercase conversions of characters
 std::array<char, 256> lowercaseConversionTable;
 
 // Text colors for better console output
@@ -23,19 +24,37 @@ std::array<char, 256> lowercaseConversionTable;
 #define RESET_TEXT_COLOR() SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 7)
 #endif
 
-// Function to initialize the lowercaseConversionTable array.
+// Function to initialize the lowercaseConversionTable array
 void InitializeLowercaseConversionTable() {
     for (int i = 0; i < 256; ++i) {
         lowercaseConversionTable[i] = static_cast<char>(std::tolower(static_cast<unsigned char>(i)));
     }
 }
 
-// Function to convert a character to lowercase using the lowercaseConversionTable.
+// Function to convert a character to lowercase using the lowercaseConversionTable
 char ConvertToLowercase(char character) {
     return lowercaseConversionTable[static_cast<unsigned char>(character)];
 }
 
-// Function to process and clean up strings to be printed.
+// Function to convert device paths to proper, logical paths with its drive letter
+std::map<std::wstring, std::wstring> GetDosPathDevicePathMap()
+{
+    wchar_t devicePath[MAX_PATH] = { 0 };
+    std::map<std::wstring, std::wstring> result;
+    std::wstring dosPath = L"A:";
+
+    for (wchar_t letter = L'A'; letter <= L'Z'; ++letter)
+    {
+        dosPath[0] = letter;
+        if (QueryDosDeviceW(dosPath.c_str(), devicePath, MAX_PATH)) 
+        {
+            result[dosPath] = devicePath;
+        }
+    }
+    return result;
+}
+
+// Function to process and clean up strings to be printed
 void CleanStringForPrinting(std::string& inputString) {
     size_t length = inputString.size();
     size_t writeIndex = 0;
@@ -72,15 +91,45 @@ void CleanStringForPrinting(std::string& inputString) {
     inputString.resize(writeIndex);
 }
 
-// Function to process and clean up a matching string before printing it.
+// Function to process and clean up a matching string before printing it
 void ProcessMatchingString(std::string& match, std::unordered_set<std::string>& printedMatches, char outputChoice, std::unique_ptr<std::ostream>& output) {
-    // Check if the match contains "HarddiskVolume" and replace it with the drive letter.
+    // Check if the match contains "HarddiskVolume" and replace it with the drive letter
     if (match.find("HarddiskVolume") != std::string::npos) {
-        size_t volumePos = match.find("\\\\Device");
-        if (volumePos != std::string::npos) {
-            char driveLetter = 'A' + match[volumePos + 24] - '1';
-            std::string driveLetterStr(1, driveLetter);
-            match.replace(volumePos, 25, driveLetterStr + ":");
+        std::map<std::wstring, std::wstring> dosPathDevicePathMap = GetDosPathDevicePathMap();
+        size_t pos = match.find("\\\\Device\\\\HarddiskVolume");
+        if (pos != std::string::npos) {
+            // Find the position of the numeric part
+            size_t start = pos + 24;
+            size_t end = start;
+            while (end < match.length() && std::isdigit(match[end])) {
+                end++;
+            }
+
+            // Extract the numeric part
+            std::string volumePart = match.substr(start, end - start);
+
+            // Trim and sanitize the extracted numeric part
+            volumePart.erase(std::remove_if(volumePart.begin(), volumePart.end(), [](char c) { return !std::isdigit(c); }), volumePart.end());
+
+            // Check if volumePart is a valid integer
+            if (!volumePart.empty()) {
+                int volNum = std::stoi(volumePart); // Convert the numeric part to an integer
+
+                // Find the corresponding drive letter
+                wchar_t driveLetter = 0;
+                for (const auto& entry : dosPathDevicePathMap) {
+                    if (entry.second.find(L"HarddiskVolume" + std::to_wstring(volNum)) != std::wstring::npos) {
+                        driveLetter = entry.first[0];
+                        break;
+                    }
+                }
+
+                // Replace the numeric part of the device path with the correct drive letter and a colon
+                if (driveLetter != 0) {
+                    std::string replacement = std::string(1, driveLetter) + ":";
+                    match.replace(pos, end - pos, replacement);
+                }
+            }
         }
     }
 
@@ -92,7 +141,7 @@ void ProcessMatchingString(std::string& match, std::unordered_set<std::string>& 
     }
 
 
-    // Check if the match contains "ProgramFiles" and replace it with a more human-readable format.
+    // Check if the match contains "ProgramFiles" and replace it with a more human-readable format
     if (match.find("ProgramFiles(x86)") != std::string::npos) {
         size_t pos = match.find("ProgramFiles(x86)");
         match.replace(pos, 17, "Program Files (x86)");
@@ -101,7 +150,7 @@ void ProcessMatchingString(std::string& match, std::unordered_set<std::string>& 
         match.replace(pos, 12, "Program Files");
     }
 
-    // Convert the match to lowercase for case-insensitive comparison.
+    // Convert the match to lowercase for case-insensitive comparison
     std::string lowercaseMatch = match;
     std::transform(lowercaseMatch.begin(), lowercaseMatch.end(), lowercaseMatch.begin(), ::tolower);
 
@@ -109,10 +158,10 @@ void ProcessMatchingString(std::string& match, std::unordered_set<std::string>& 
 
         // Remove "file:///" prefix (first 8 characters)
         match = match.substr(8);
-        CleanStringForPrinting(match); // Clean up the string further.
+        CleanStringForPrinting(match); // Clean up the string further
 
         if (printedMatches.find(lowercaseMatch) == printedMatches.end() && match.length() <= 110) {
-        printedMatches.insert(lowercaseMatch); // Insert the lowercase match into the set to keep track of it.
+        printedMatches.insert(lowercaseMatch); // Insert the lowercase match into the set to keep track of it
 
             // Print the modified match in the desired output.
             if (outputChoice == 'C' || outputChoice == 'c') {
@@ -126,14 +175,14 @@ void ProcessMatchingString(std::string& match, std::unordered_set<std::string>& 
         }
     }
 
-    CleanStringForPrinting(match); // Clean up the string further.
+    CleanStringForPrinting(match); // Clean up the string further
 
-    // Check if the lowercase match has not been previously printed and meets the length condition.
+    // Check if the lowercase match has not been previously printed and meets the length condition
     if (printedMatches.find(lowercaseMatch) == printedMatches.end() && match.length() <= 110) {
-        // Insert the lowercase match into the set to keep track of it.
+        // Insert the lowercase match into the set to keep track of it
         printedMatches.insert(lowercaseMatch);
 
-        // Print the original match in the desired output.
+        // Print the original match in the desired output
         if (outputChoice == 'C' || outputChoice == 'c') {
             SET_TEXT_COLOR_BLUE(); // Set text color to blue
             std::cout << "Executed file: ";
@@ -147,14 +196,14 @@ void ProcessMatchingString(std::string& match, std::unordered_set<std::string>& 
 
 int main(int argc, char* argv[]) {
     InitializeLowercaseConversionTable();
-
+    
     std::string filename;
     std::vector<char> buffer;
     std::string overlapData;
     std::unordered_set<std::string> printedMatches;
     std::unique_ptr<std::ostream> output;
 
-    // Check if a filename is provided as a command-line argument, otherwise prompt the user to enter a file path.
+    // Check if a filename is provided as a command-line argument, otherwise prompt the user to enter a file path
     if (argc > 1) {
         filename = argv[1];
     } else {
@@ -165,7 +214,7 @@ int main(int argc, char* argv[]) {
     char outputChoice;
     bool validChoice = false;
 
-    // Prompt the user for the output choice (console or file) and validate the input.
+    // Prompt the user for the output choice (console or file) and validate the input
     while (!validChoice) {
         std::cout << "Do you want to print the matched strings to the console (C) or to a file (F)? ";
         std::cin >> outputChoice;
@@ -181,30 +230,30 @@ int main(int argc, char* argv[]) {
 
     std::ifstream file(filename, std::ios::binary | std::ios::in);
 
-    // Check if the file can be opened; if not, display an error message.
+    // Check if the file can be opened; if not, display an error message
     if (!file.is_open()) {
         std::cerr << "Failed to open the file, probably because it is already opened by another application or you provided a wrong path." << std::endl;
         return 1;
     }
 
-    // If the output choice is a file, open an output file for writing.
+    // If the output choice is a file, open an output file for writing
     if (outputChoice == 'F' || outputChoice == 'f') {
         std::string outputFilePath = "memdump_results.txt";
         output = std::make_unique<std::ofstream>(outputFilePath);
 
-        // Check if the output file can be opened; if not, display an error message.
+        // Check if the output file can be opened; if not, display an error message
         if (!output->good()) {
             std::cerr << "Failed to open the output file. Try to select the 'C' option to print results to the console if this keeps happening." << std::endl;
             return 1;
         }
     }
 
-    // Get the file size to determine the appropriate chunk size.
+    // Get the file size to determine the appropriate chunk size
     file.seekg(0, std::ios::end);
     size_t fileSize = static_cast<size_t>(file.tellg());
     file.seekg(0, std::ios::beg);
 
-    // Determine the chunk size based on the file size.
+    // Determine the chunk size based on the file size
     size_t chunkSize = (fileSize > MIN_CHUNK_SIZE) ? MIN_CHUNK_SIZE : fileSize;
     buffer.resize(chunkSize);
 
@@ -220,15 +269,15 @@ int main(int argc, char* argv[]) {
 
     bool done = false;
 
-    // Process the memory image in chunks.
+    // Process the memory image in chunks
     while (!done) {
         file.read(buffer.data(), chunkSize);
         std::streamsize bytesRead = file.gcount();
         if (bytesRead > 0) {
             std::string data(buffer.data(), static_cast<size_t>(bytesRead));
-            // Append any remaining overlapData from the previous chunk to the current data.
+            // Append any remaining overlapData from the previous chunk to the current data
             data = overlapData + data;
-            // Clear the overlapData variable as it has been processed.
+            // Clear the overlapData variable as it has been processed
             overlapData.clear();
 
             size_t pos1, pos2;
@@ -240,49 +289,49 @@ int main(int argc, char* argv[]) {
             */ 
 
             /** 
-             * "file:///" -> Explorer string (evidence of file accessed/opened)
-             * "ImageName" -> SgrmBroker string
-             * "AppPath" -> CDPUserSvc and TextInputHost strings
-             * "!!" -> DPS string (indicating compilation time of an executable)
-             * ".exe" and ". e x e" -> ending of any substring (with or without spaces)
+             * "file:///" -> Explorer string (evidence of file accessed/opened).
+             * "ImageName" -> SgrmBroker string.
+             * "AppPath" -> CDPUserSvc and TextInputHost strings.
+             * "!!" -> DPS string (indicating compilation time of an executable).
+             * ".exe" and ". e x e" -> ending of any substring (with or without spaces).
             */
 
-            // The matching substrings are passed to ProcessMatchingString for cleaning and printing.
+            // The matching substrings are passed to ProcessMatchingString for cleaning and printing
 
-            // Search for occurrences of "file:///" pattern in the input data.
+            // Search for occurrences of "file:///" pattern in the input data
             pos1 = data.find("file:///");
 
-            // If the pattern is found in the data string.
+            // If the pattern is found in the data string
             if (pos1 != std::string::npos) {
-                // Check if there is at least one character after "file:///", followed by a colon and a slash.
+                // Check if there is at least one character after "file:///", followed by a colon and a slash
                 if (pos1 + 8 < data.length()) {
                     char afterPattern = data[pos1 + 9];
                     if (isalpha(afterPattern) && data[pos1 + 10] == ':' && data[pos1 + 11] == '/') {
-                        // Extract a substring starting from the position of the pattern.
+                        // Extract a substring starting from the position of the pattern
                         auto dataSubstring = data.substr(pos1);
 
-                        // Search for the ".exe" pattern within the extracted substring.
+                        // Search for the ".exe" pattern within the extracted substring
                         auto it = std::search(dataSubstring.begin(), dataSubstring.end(), ".exe", ".exe" + 4,
                             [](char a, char b) {
                                 return ConvertToLowercase(a) == ConvertToLowercase(b);
                             });
 
-                        // If ".exe" is found within the substring.
+                        // If ".exe" is found within the substring
                         if (it != dataSubstring.end()) {
-                            // Calculate the end position of the matched substring.
+                            // Calculate the end position of the matched substring
                             pos2 = pos1 + static_cast<size_t>(std::distance(dataSubstring.begin(), it));
 
-                            // Extract the matched string, including "file:///" and the ".exe" extension.
+                            // Extract the matched string, including "file:///" and the ".exe" extension
                             std::string match = data.substr(pos1, pos2 - pos1 + 4);
 
-                            // Process the matching string using a function named ProcessMatchingString.
+                            // Process the matching string using a function named ProcessMatchingString
                             ProcessMatchingString(match, printedMatches, outputChoice, output);
                         }
                     }
                 }
             }
 
-            // Handle the "ImageName" pattern.
+            // Handle the "ImageName" pattern
             pos1 = data.find("\"ImageName\":\"");
             if (pos1 != std::string::npos) {
                 auto dataSubstring = data.substr(pos1);
@@ -298,7 +347,7 @@ int main(int argc, char* argv[]) {
                 }
             }
 
-            // Handle the "AppPath" pattern.
+            // Handle the "AppPath" pattern
             pos1 = data.find("\"AppPath\":\"");
             if (pos1 != std::string::npos) {
                 auto dataSubstring = data.substr(pos1);
@@ -381,7 +430,7 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    // Check if any printed matches correspond to non-existing files and print a message.
+    // Check if any printed matches correspond to non-existing files and print a message
     for (const std::string& printedMatch : printedMatches) {
         if (std::isalpha(printedMatch[0]) && printedMatch.size() >= 3 &&
             printedMatch[1] == ':' && printedMatch[2] == '\\') {
@@ -398,10 +447,10 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    // Close the input file.
+    // Close the input file
     file.close();
 
-    // Display a message and wait for user input before exiting the program.
+    // Wait for user input before exiting the program
     std::cout << "Scan finished. Press Enter to exit the program...";
     std::cin.get();
 
