@@ -23,7 +23,7 @@ Before using this tool, ensure that you have the following:
   1. Any Windows Server version
   2. Windows 7 or above.
      
-- If you dont have MSYS2 installed (GCC), put the following dll files (attached in the "Releases" section of this repository) near memparser.exe
+- If you do not have MSYS2 installed (GCC), put the following dll files (attached in the "Releases" section of this repository) near memparser.exe
   
   1. libgcc_s_seh-1.dll
   2. libstdc++-6.dll
@@ -76,6 +76,7 @@ If you want to stop the scanning process, you can do so at any time by pressing 
 - Detects executed deleted files.
 - Text color for console output.
 - Converts non human readable paths into readable and accessible paths.
+- Allows you to work with the memory image file in other applications while the program scans it.
 - (Soon) Detects digitally unsigned executed files.
 
 ## Bugs
