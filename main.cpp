@@ -63,7 +63,13 @@ void CleanStringForPrinting(std::string& inputString) {
         switch (currentChar) {
             case '%':
                 if (readIndex + 2 < length) {
-                    switch (inputString[readIndex + 2]) {
+                    switch (inputString[readIndex + 1]) {
+                        case '3':
+                            if (inputString[readIndex + 2] == 'A') {
+                                currentChar = ':';
+                                readIndex += 2;
+                            }
+                            break;
                         case '0':
                             currentChar = ' ';
                             readIndex += 2;
@@ -150,15 +156,15 @@ void ProcessMatchingString(std::string& match, std::unordered_set<std::string>& 
         match.replace(pos, 12, "Program Files");
     }
 
-    // Convert the match to lowercase for case-insensitive comparison
-    std::string lowercaseMatch = match;
-    std::transform(lowercaseMatch.begin(), lowercaseMatch.end(), lowercaseMatch.begin(), ::tolower);
-
     if (match.find("file:///") != std::string::npos) {
 
         // Remove "file:///" prefix (first 8 characters)
         match = match.substr(8);
         CleanStringForPrinting(match); // Clean up the string further
+
+        // Convert the match to lowercase for case-insensitive comparison
+        std::string lowercaseMatch = match;
+        std::transform(lowercaseMatch.begin(), lowercaseMatch.end(), lowercaseMatch.begin(), ::tolower);
 
         if (printedMatches.find(lowercaseMatch) == printedMatches.end() && match.length() <= 110 && match.length() > 4) {
         printedMatches.insert(lowercaseMatch); // Insert the lowercase match into the set to keep track of it
@@ -176,6 +182,10 @@ void ProcessMatchingString(std::string& match, std::unordered_set<std::string>& 
     }
 
     CleanStringForPrinting(match); // Clean up the string further
+
+    // Convert the match to lowercase for case-insensitive comparison
+    std::string lowercaseMatch = match;
+    std::transform(lowercaseMatch.begin(), lowercaseMatch.end(), lowercaseMatch.begin(), ::tolower);
 
     // Check if the lowercase match has not been previously printed and meets the length condition
     if (printedMatches.find(lowercaseMatch) == printedMatches.end() && match.length() <= 110 && match.length() > 4) {
@@ -301,46 +311,70 @@ int main(int argc, char* argv[]) {
             // Search for occurrences of "file:///" pattern in the input data
             pos1 = data.find("file:///");
 
-            // If the pattern is found in the data string
+            // If the pattern "file:///" is found in the data string:
             if (pos1 != std::string::npos) {
-                // Check if there is at least one character after "file:///", followed by a colon and a slash
-                if (pos1 + 8 < data.length()) {
-                    char afterPattern = data[pos1 + 9];
-                    if (isalpha(afterPattern) && data[pos1 + 10] == ':' && data[pos1 + 11] == '/') {
-                        // Extract a substring starting from the position of the pattern
-                        auto dataSubstring = data.substr(pos1);
-
-                        // Search for the ".exe" pattern within the extracted substring
-                        auto it = std::search(dataSubstring.begin(), dataSubstring.end(), ".exe", ".exe" + 4, // Increment +4 here to include the ".exe" extension
-                            [](char a, char b) {
-                                return ConvertToLowercase(a) == ConvertToLowercase(b);
-                            });
-
-                        // If ".exe" is found within the substring:
-                        if (it != dataSubstring.end()) {
-                            // Calculate the end position of the matched substring
-                            pos2 = pos1 + static_cast<size_t>(std::distance(dataSubstring.begin(), it));
-
-                            // Extract the matched string, including "file:///" and the ".exe" extension
-                            std::string match = data.substr(pos1, pos2 - pos1 + 4);
-
-                            // Process the matching string using a function named ProcessMatchingString
-                            ProcessMatchingString(match, printedMatches, outputChoice, output);
-                        }
-                    }
-                }
-            }
-
-            // Handle the "ImageName" pattern
-            pos1 = data.find("\"ImageName\":\"\\\\Device\\\\HarddiskVolume");
-            if (pos1 != std::string::npos) {
+                // Extract a substring starting from the position of the pattern.
                 auto dataSubstring = data.substr(pos1);
-                auto it = std::search(dataSubstring.begin(), dataSubstring.end(), ".exe", ".exe" + 4, // Increment +4 here to include the ".exe" extension.
+
+                // Search for the ".exe" pattern within the extracted substring.
+                auto it = std::search(dataSubstring.begin(), dataSubstring.end(), ".exe", ".exe" + 4,
                     [](char a, char b) {
                         return ConvertToLowercase(a) == ConvertToLowercase(b);
                     });
 
-                if (it != dataSubstring.end()) {
+                // Check for additional occurrences of "file:///" between pos1 and it.
+                bool hasFileOccurrences = false;
+                for (auto it2 = dataSubstring.begin() + 7; it2 < it; ++it2) {
+                    if (std::equal(it2, it2 + 7, "file:///")) {
+                        hasFileOccurrences = true;
+                        break;
+                    }
+                }
+
+                // Check for the presence of special characters between "file:///" and ".exe".
+                bool hasSpecialCharactersBetween = false;
+                const std::string specialCharacters = "*\"<>?|:\\";
+                for (auto it2 = dataSubstring.begin() + 7; it2 < it; ++it2) {
+                    if (specialCharacters.find(*it2) != std::string::npos) {
+                        hasSpecialCharactersBetween = true;
+                        break;
+                    }
+                }
+
+                // If there are no additional "file:///" between the initial "file:///" and ".exe",
+                // and there are no special characters between them:
+                if (!hasFileOccurrences && !hasSpecialCharactersBetween && it != dataSubstring.end()) {
+                    // Calculate the end position of the matched substring.
+                    size_t pos2 = pos1 + static_cast<size_t>(std::distance(dataSubstring.begin(), it));
+
+                    // Extract the matched string, including "file:///" and the ".exe" extension.
+                    std::string match = data.substr(pos1, pos2 - pos1 + 4);
+
+                    // Process the matching string using a function named ProcessMatchingString.
+                    ProcessMatchingString(match, printedMatches, outputChoice, output);
+                }
+            }
+
+            // Handle the "ImageName" pattern
+            pos1 = data.find("\"ImageName\":\"");
+            if (pos1 != std::string::npos) {
+                auto dataSubstring = data.substr(pos1);
+                auto it = std::search(dataSubstring.begin(), dataSubstring.end(), ".exe\"", ".exe\"" + 4, // Increment +4 to include the ".exe" extension.
+                    [](char a, char b) {
+                        return ConvertToLowercase(a) == ConvertToLowercase(b);
+                    });
+
+                // Check for the presence of special characters between "ImageName":" and ".exe".
+                bool hasSpecialCharactersBetween = false;
+                const std::string specialCharacters = "*\"<>?|:\\";
+                for (auto it2 = dataSubstring.begin() + 13; it2 < it; ++it2) {
+                    if (specialCharacters.find(*it2) != std::string::npos) {
+                        hasSpecialCharactersBetween = true;
+                        break;
+                    }
+                }
+
+                if (it != dataSubstring.end() && !hasSpecialCharactersBetween) {
                     pos2 = pos1 + static_cast<size_t>(std::distance(dataSubstring.begin(), it));
                     // Increment +13 here to skip the "ImageName":" part of the string, leaving only the device path.
                     std::string match = data.substr(pos1 + 13, pos2 - pos1 - 13 + 4); 
