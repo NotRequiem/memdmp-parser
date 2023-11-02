@@ -248,7 +248,7 @@ int main(int argc, char* argv[]) {
 
     // If the output choice is a file, open an output file for writing
     if (outputChoice == 'F' || outputChoice == 'f') {
-        std::string outputFilePath = "memdump_results.txt";
+        std::string outputFilePath = "memparser_results.txt";
         output = std::make_unique<std::ofstream>(outputFilePath);
 
         // Check if the output file can be opened; if not, display an error message
@@ -268,7 +268,7 @@ int main(int argc, char* argv[]) {
     buffer.resize(chunkSize);
 
     if (outputChoice == 'F' || outputChoice == 'f') {
-        std::string outputFilePath = "memdump_results.txt";
+        std::string outputFilePath = "memparser_results.txt";
         output = std::make_unique<std::ofstream>(outputFilePath);
 
         if (!output->good()) {
@@ -310,6 +310,7 @@ int main(int argc, char* argv[]) {
              * "ImageName" -> SgrmBroker string.
              * "AppPath" -> CDPUserSvc and TextInputHost strings.
              * "!!" -> DPS string (indicating compilation time of an executable).
+             * "\??\" -> Explorer and csrss string (evidence of execution).
              * ".exe" and ". e x e" -> ending of any substring (with or without spaces).
             */
 
