@@ -510,6 +510,27 @@ int main(int argc, char* argv[]) {
                     }
                 }
             }
+
+            pos1 = data.find("\\??\\");
+            if (pos1 != std::string::npos) {
+                pos1 += 4; // Move past \\??\\ //
+                auto dataSubstring = data.substr(pos1);
+
+                // Check if the substring has at least 3 characters (letter, colon, slash)
+                if (dataSubstring.size() >= 3 && std::isalpha(dataSubstring[0]) && dataSubstring[1] == ':' && dataSubstring[2] == '/') {
+                    auto it = std::search(dataSubstring.begin(), dataSubstring.end(), ".exe", ".exe" + 4, // Increment +4 here to include the ".exe" extension.
+                        [](char a, char b) {
+                            return std::tolower(a) == std::tolower(b);
+                        });
+
+                    if (it != dataSubstring.end()) {
+                        pos2 = pos1 + static_cast<size_t>(std::distance(dataSubstring.begin(), it));
+                        std::string match = data.substr(pos1 + 4, pos2 - pos1); // Increment +4 here to include the ".exe" extension
+                        ProcessMatchingString(match, printedMatches, outputChoice, output);
+                    }
+                }
+            }
+
             // Store the last part of data (220 characters) for overlap with the next chunk.
             // This ensures that any partial information at the end of the chunk is retained for the next iteration.
             overlapData = data.substr(data.size() - 220);
