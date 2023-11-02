@@ -13,6 +13,7 @@ This is a memory image analysis tool designed to extract and process information
 
 ![imgintroduction](images/overview.png)
 
+
 ![imgintroduction2](images/overview_2.png)
 
 ## Requirements
@@ -30,8 +31,10 @@ Before using this tool, ensure that you have the following:
   1. libgcc_s_seh-1.dll
   2. libstdc++-6.dll
   3. libwinpthread-1.dll
+ 
+  ![imgrequirements](images/dependencies.png)
      
-The program does not need administrator privileges or network connection to run.
+The program does not need administrator privileges or a network connection to run.
 
 ## Usage
 
