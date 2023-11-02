@@ -311,12 +311,12 @@ int main(int argc, char* argv[]) {
                         auto dataSubstring = data.substr(pos1);
 
                         // Search for the ".exe" pattern within the extracted substring
-                        auto it = std::search(dataSubstring.begin(), dataSubstring.end(), ".exe", ".exe" + 4,
+                        auto it = std::search(dataSubstring.begin(), dataSubstring.end(), ".exe", ".exe" + 4, // Increment +4 here to include the ".exe" extension
                             [](char a, char b) {
                                 return ConvertToLowercase(a) == ConvertToLowercase(b);
                             });
 
-                        // If ".exe" is found within the substring
+                        // If ".exe" is found within the substring:
                         if (it != dataSubstring.end()) {
                             // Calculate the end position of the matched substring
                             pos2 = pos1 + static_cast<size_t>(std::distance(dataSubstring.begin(), it));
@@ -332,17 +332,18 @@ int main(int argc, char* argv[]) {
             }
 
             // Handle the "ImageName" pattern
-            pos1 = data.find("\"ImageName\":\"");
+            pos1 = data.find("\"ImageName\":\"\\\\Device\\\\HarddiskVolume");
             if (pos1 != std::string::npos) {
                 auto dataSubstring = data.substr(pos1);
-                auto it = std::search(dataSubstring.begin(), dataSubstring.end(), ".exe", ".exe" + 4,
+                auto it = std::search(dataSubstring.begin(), dataSubstring.end(), ".exe", ".exe" + 4, // Increment +4 here to include the ".exe" extension.
                     [](char a, char b) {
                         return ConvertToLowercase(a) == ConvertToLowercase(b);
                     });
 
                 if (it != dataSubstring.end()) {
                     pos2 = pos1 + static_cast<size_t>(std::distance(dataSubstring.begin(), it));
-                    std::string match = data.substr(pos1 + 13, pos2 - pos1 - 13 + 4);
+                    // Increment +13 here to skip the "ImageName":" part of the string, leaving only the device path.
+                    std::string match = data.substr(pos1 + 13, pos2 - pos1 - 13 + 4); 
                     ProcessMatchingString(match, printedMatches, outputChoice, output);
                 }
             }
@@ -350,19 +351,19 @@ int main(int argc, char* argv[]) {
             // Handle the "AppPath" pattern
             pos1 = data.find("\"AppPath\":\"");
             if (pos1 != std::string::npos) {
-                pos1 += 10; // Move past "AppPath":"
+                pos1 += 12; // Move past "AppPath":"
                 auto dataSubstring = data.substr(pos1);
 
                 // Check if the first character in dataSubstring is an alphabetic character
                 if (dataSubstring.size() > 0 && std::isalpha(dataSubstring[0])) {
-                    auto it = std::search(dataSubstring.begin(), dataSubstring.end(), ".exe", ".exe" + 4,
+                    auto it = std::search(dataSubstring.begin(), dataSubstring.end(), ".exe", ".exe" + 4, // Increment +4 here to include the ".exe" extension.
                         [](char a, char b) {
                             return ConvertToLowercase(a) == ConvertToLowercase(b);
                         });
 
                     if (it != dataSubstring.end()) {
                         pos2 = pos1 + static_cast<size_t>(std::distance(dataSubstring.begin(), it));
-                        std::string match = data.substr(pos1, pos2 - pos1 + 4);
+                        std::string match = data.substr(pos1, pos2 - pos1 + 4); // Increment +4 here to include the ".exe" extension
                         ProcessMatchingString(match, printedMatches, outputChoice, output);
                     }
                 }
@@ -386,16 +387,16 @@ int main(int argc, char* argv[]) {
                     pos2 = data.find(searchStringWithSpaces, pos1);
                 }
 
-                // If ".exe!" or ". e x e !" is found
+                // If ".exe!" or ". e x e !" is found:
                 if (pos2 != std::string::npos) {
                     // Calculate the start and end positions of the match
-                    size_t start = (pos1 == data.find("!!") ? (pos1 + 2) : (pos1 + 4));
+                    size_t start = (pos1 == data.find("!!") ? (pos1 + 2) : (pos1 + 4)); // Skip 2 characters if no spaces between characters were found, 4 otherwise
                     size_t endPos = pos2 + ((pos2 == data.find(searchStringWithSpaces, pos1)) ? 7 : 4);
 
                     /** 
                      * 
                      * This code block checks if a DPS string with a correct format was found to avoid false flagging corrupt data.
-                     * We will take !!svchost.exe!2092/10/12:19:58:29! as a example to explain this part of the code.
+                     * I will take !!svchost.exe!2092/10/12:19:58:29! as an example to explain this part of the code.
                      * Each character is checked. For example, a DPS string will always have a digit in the first position after ".exe!" or ". e x e !".
                      * We can analyze if at a certain bit of the string, there is a digit, a colon, a slash, etc... to check if a DPS string was found.
                      * 
@@ -429,7 +430,7 @@ int main(int argc, char* argv[]) {
                             c19 = data[endPos + 38]; // 9
                             c20 = data[endPos + 40]; // !
                         } else {
-                            // If ".exe!" was found, we can use normal positions since there are no spaces between characters to skip
+                            // If ".exe!" was found, use normal positions since there are no spaces between characters to skip
                             c1 = data[endPos + 1]; // 2
                             c2 = data[endPos + 2]; // 0
                             c3 = data[endPos + 3]; // 9
@@ -463,7 +464,7 @@ int main(int argc, char* argv[]) {
                     // If a DPS string format was found succesfully:
                     if (CorrectFormat) {
                         std::string match = data.substr(start, endPos - start); // We extract the executable name
-                        // We process the matching string
+                        // Process the extracted string
                         ProcessMatchingString(match, printedMatches, outputChoice, output);
                     }
                 }
