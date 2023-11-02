@@ -48,7 +48,7 @@ memparser.exe C:\Users\PC\Downloads\memdump.mem
 2. Output Choices:
 
 - You can choose to print the results to the console (C) or to a file (F) when prompted.
-- If you choose to send the results to a file (F), the program will generate a memdump_results.txt in the path where memparser.exe is located.
+- If you choose to send the results to a file (F), the program will generate a "memparser_results.txt" file in the path where memparser.exe is located.
 
 ![imgoutput](images/memparser_results.png)
 
