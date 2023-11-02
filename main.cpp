@@ -285,10 +285,17 @@ int main(int argc, char* argv[]) {
         std::streamsize bytesRead = file.gcount();
         if (bytesRead > 0) {
             std::string data(buffer.data(), static_cast<size_t>(bytesRead));
-            // Append any remaining overlapData from the previous chunk to the current data
+            // Append any remaining overlapData from the previous chunk to the current data.
             data = overlapData + data;
-            // Clear the overlapData variable as it has been processed
+            // Clear the overlapData variable as it has been processed.
             overlapData.clear();
+
+/**
+ * The overlapData variable is used to handle overlapping data between successive chunks of data read from a memory image file. 
+ * The program processes the memory image file in chunks for more efficient data processing.
+ * overlapData is employed to ensure that any partial information at the end of one chunk is retained and combined with the data in the next chunk. 
+ * This prevents splitting and processing of incomplete information that might span across two chunks.
+*/
 
             size_t pos1, pos2;
 
