@@ -341,9 +341,16 @@ int main(int argc, char* argv[]) {
                     }
                 }
 
+                // Check for the presence of a slash "/" between "file:///" and ".exe".
+                bool hasSlashBetween = false;
+                auto slashPosition = std::find(dataSubstring.begin() + 8, it, '/');
+                if (slashPosition != it) {
+                    hasSlashBetween = true;
+                }
+
                 // If there are no additional "file:///" between the initial "file:///" and ".exe",
-                // and there are no special characters between them:
-                if (!hasFileOccurrences && !hasSpecialCharactersBetween && it != dataSubstring.end()) {
+                // and there are no special characters and there is a slash "/" between them:
+                if (!hasFileOccurrences && !hasSpecialCharactersBetween && hasSlashBetween && it != dataSubstring.end()) {
                     // Calculate the end position of the matched substring.
                     size_t pos2 = pos1 + static_cast<size_t>(std::distance(dataSubstring.begin(), it));
 
