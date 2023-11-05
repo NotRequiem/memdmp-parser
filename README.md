@@ -9,10 +9,9 @@
 
 # memparser
 
-This is a memory image analysis tool designed to extract and process information related to file access or execution evidence from a RAM memory dump. The tool scans the memory image, identifies specific patterns, and provides insights into executed files, potentially deleted files, and more.
+This is a memory image analysis tool designed to extract and process information related to file access or execution evidence from a RAM memory dump. The tool scans the memory image, identifies specific patterns, and provides insights into executed files, potentially deleted files, accessed files and executed unsigned files.
 
 ![imgintroduction](images/overview.png)
-
 
 ![imgintroduction2](images/overview_2.png)
 
@@ -57,7 +56,7 @@ memparser.exe C:\Users\PC\Downloads\memdump.mem
 
 3. View Results:
 
-- The tool will analyze the memory dump and display or save the matched strings, providing insights into executed and potentially deleted files.
+- The tool will analyze the memory dump and display or save the matched strings, providing insights into executed, accessed, unsigned and potentially deleted files.
 
 ![imgresults](images/executed_files.png) 
 
@@ -79,10 +78,10 @@ If you want to stop the scanning process, you can do so at any time by pressing 
 - Identifies file access evidence.
 - Provides information about executed files.
 - Detects executed deleted files.
+- Detects digitally unsigned executed files.
 - Text color for console output.
 - Converts non human readable paths into readable and accessible paths.
 - Allows you to work with the memory image file in other applications while the program scans it.
-- (Soon) Detects digitally unsigned executed files.
 
 ## Bugs
 
