@@ -184,7 +184,14 @@ void InitializeLowercaseConversionTable() {
 
 // Function to convert a character to lowercase using the lowercaseConversionTable
 char ConvertToLowercase(char character) {
-    return lowercaseConversionTable[static_cast<unsigned char>(character)];
+    // Ensure that the character is within the valid range (0-255)
+    if (character >= 0 && character <= 255) {
+        return lowercaseConversionTable[static_cast<unsigned char>(character)];
+    }
+    else {
+        // Return the character as is if it's out of bounds
+        return character;
+    }
 }
 
 // Function to convert device paths to proper, logical paths with its drive letter
