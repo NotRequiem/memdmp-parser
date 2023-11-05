@@ -1,5 +1,10 @@
 #include <windows.h>
+#include <Softpub.h>
+#include <wincrypt.h>
+#include <mscat.h>
 #include <iostream>
+#include <limits>
+#include <tchar.h>
 #include <fstream>
 #include <string>
 #include <array>
@@ -7,8 +12,153 @@
 #include <memory>
 #include <vector>
 #include <algorithm>
-#include <limits>
 #include <map>
+#include <set>
+
+#pragma comment(lib, "wintrust.lib")
+#pragma comment(lib, "Crypt32.lib")
+
+class TrustVerifyWrapper {
+public:
+    bool VerifyFileSignature(const std::wstring& filePath) {
+        return CheckFileSignature(filePath, L"SHA256") == ERROR_SUCCESS;
+    }
+
+    DWORD CheckFileSignature(const std::wstring& aPePath, const std::wstring& aCatalogHashAlgo) {
+        if (verifyFromFile(aPePath) == ERROR_SUCCESS) {
+            return ERROR_SUCCESS;
+        }
+        return verifyFromCatalog(aPePath, aCatalogHashAlgo);
+    }
+
+private:
+    DWORD verifyFromFile(const std::wstring& aPePath) {
+        WINTRUST_FILE_INFO fileData;
+        memset(&fileData, 0, sizeof(WINTRUST_FILE_INFO));
+        fileData.cbStruct = sizeof(WINTRUST_FILE_INFO);
+        fileData.pcwszFilePath = aPePath.c_str();
+        fileData.hFile = NULL;
+        fileData.pgKnownSubject = NULL;
+
+        GUID guidAction = WINTRUST_ACTION_GENERIC_VERIFY_V2;
+        WINTRUST_DATA winTrustData;
+        memset(&winTrustData, 0, sizeof(WINTRUST_DATA));
+        winTrustData.cbStruct = sizeof(WINTRUST_DATA);
+        winTrustData.dwUIChoice = WTD_UI_NONE;
+        winTrustData.fdwRevocationChecks = WTD_REVOKE_NONE;
+        winTrustData.dwUnionChoice = WTD_CHOICE_FILE;
+        winTrustData.pFile = &fileData;
+
+        return WinVerifyTrust(NULL, &guidAction, &winTrustData);
+    }
+
+    DWORD verifyFromCatalog(const std::wstring& aPePath, const std::wstring& aCatalogHashAlgo) {
+        LONG lStatus = TRUST_E_NOSIGNATURE;
+        GUID WintrustVerifyGuid = WINTRUST_ACTION_GENERIC_VERIFY_V2;
+        GUID DriverActionGuid = DRIVER_ACTION_VERIFY;
+        HANDLE hFile;
+        DWORD dwHash;
+        BYTE bHash[100];
+        HCATINFO hCatInfo = NULL;
+        HCATADMIN hCatAdmin;
+
+        hFile = CreateFileW(aPePath.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (hFile == INVALID_HANDLE_VALUE) {
+            return GetLastError();
+        }
+
+        if (!CryptCATAdminAcquireContext2(
+            &hCatAdmin,
+            &DriverActionGuid,
+            aCatalogHashAlgo.c_str(),
+            NULL,
+            0)) {
+            CloseHandle(hFile);
+            return GetLastError();
+        }
+
+        dwHash = sizeof(bHash);
+        if (!CryptCATAdminCalcHashFromFileHandle2(
+            hCatAdmin,
+            hFile,
+            &dwHash,
+            bHash,
+            0)) {
+            CloseHandle(hFile);
+            return GetLastError();
+        }
+
+        auto lHashWstr = ByteHashIntoWstring(bHash, dwHash);
+
+        hCatInfo = CryptCATAdminEnumCatalogFromHash(hCatAdmin, bHash, dwHash, 0, NULL);
+
+        if (!hCatInfo) {
+            CryptCATAdminReleaseContext(hCatAdmin, 0);
+            CloseHandle(hFile);
+            return GetLastError();
+        }
+
+        lStatus = verifyTrustFromCatObject(hCatInfo, aPePath, lHashWstr);
+
+        CryptCATAdminReleaseCatalogContext(hCatAdmin, hCatInfo, 0);
+        CryptCATAdminReleaseContext(hCatAdmin, 0);
+        CloseHandle(hFile);
+
+        return lStatus;
+    }
+
+    DWORD verifyTrustFromCatObject(HCATINFO aCatInfo, const std::wstring& aFileName, const std::wstring& aHash) {
+        GUID WintrustVerifyGuid = WINTRUST_ACTION_GENERIC_VERIFY_V2;
+
+        WINTRUST_DATA wd = { 0 };
+        WINTRUST_CATALOG_INFO wci = { 0 };
+
+        CATALOG_INFO ci = { 0 };
+        CryptCATCatalogInfoFromContext(aCatInfo, &ci, 0);
+
+        memset(&wci, 0, sizeof(wci));
+        wci.cbStruct = sizeof(WINTRUST_CATALOG_INFO);
+        wci.pcwszCatalogFilePath = ci.wszCatalogFile;
+        wci.pcwszMemberFilePath = aFileName.c_str();
+        wci.pcwszMemberTag = aHash.c_str();
+
+        memset(&wd, 0, sizeof(wd));
+        wd.cbStruct = sizeof(WINTRUST_DATA);
+        wd.fdwRevocationChecks = WTD_REVOKE_NONE;
+        wd.dwUnionChoice = WTD_CHOICE_CATALOG;
+        wd.pCatalog = &wci;
+        wd.dwUIChoice = WTD_UI_NONE;
+        wd.dwUIContext = WTD_UICONTEXT_EXECUTE;
+        wd.fdwRevocationChecks = WTD_STATEACTION_VERIFY;
+        wd.dwStateAction = WTD_STATEACTION_VERIFY;
+        wd.dwProvFlags = 0;
+        wd.hWVTStateData = NULL;
+        wd.pwszURLReference = NULL;
+        wd.pPolicyCallbackData = NULL;
+        wd.pSIPClientData = NULL;
+        wd.dwUIContext = 0;
+
+        return WinVerifyTrust(NULL, &WintrustVerifyGuid, &wd);
+    }
+
+    std::wstring ByteHashIntoWstring(BYTE* aHash, size_t aHashLen) {
+        if (!aHash || !aHashLen) {
+            return L"";
+        }
+
+        auto lHashString = new WCHAR[aHashLen * 2 + 1];
+
+        for (DWORD dw = 0; dw < aHashLen; ++dw) {
+            wsprintfW(&lHashString[dw * 2], L"%02X", aHash[dw]);
+        }
+
+        std::wstring lHashWstr(lHashString);
+
+        delete[] lHashString;
+
+        return lHashWstr;
+    }
+};
 
 // Define a constant CHUNK_SIZE for reading data in chunks (resulting in a faster data processing)
 constexpr size_t MIN_CHUNK_SIZE = 330;
@@ -18,9 +168,10 @@ std::array<char, 256> lowercaseConversionTable;
 
 // Text colors for better console output
 #ifdef _WIN32
-#define SET_TEXT_COLOR_RED() SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 12)
 #define SET_TEXT_COLOR_BLUE() SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 9)
 #define SET_TEXT_COLOR_GREEN() SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 10)
+#define SET_TEXT_COLOR_RED() SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 12)
+#define SET_TEXT_COLOR_YELLOW() SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 14)
 #define RESET_TEXT_COLOR() SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 7)
 #endif
 
@@ -46,7 +197,7 @@ std::map<std::wstring, std::wstring> GetDosPathDevicePathMap()
     for (wchar_t letter = L'A'; letter <= L'Z'; ++letter)
     {
         dosPath[0] = letter;
-        if (QueryDosDeviceW(dosPath.c_str(), devicePath, MAX_PATH)) 
+        if (QueryDosDeviceW(dosPath.c_str(), devicePath, MAX_PATH))
         {
             result[dosPath] = devicePath;
         }
@@ -61,33 +212,33 @@ void CleanStringForPrinting(std::string& inputString) {
     for (size_t readIndex = 0; readIndex < length; ++readIndex) {
         char currentChar = inputString[readIndex];
         switch (currentChar) {
-            case '%':
-                if (readIndex + 2 < length) {
-                    switch (inputString[readIndex + 1]) {
-                        case '3':
-                            if (inputString[readIndex + 2] == 'A') {
-                                currentChar = ':';
-                                readIndex += 2;
-                            }
-                            break;
-                        case '0':
-                            currentChar = ' ';
-                            readIndex += 2;
-                            break;
-                        case '8':
-                            currentChar = '(';
-                            readIndex += 2;
-                            break;
-                        case '9':
-                            currentChar = ')';
-                            readIndex += 2;
-                            break;
+        case '%':
+            if (readIndex + 2 < length) {
+                switch (inputString[readIndex + 1]) {
+                case '3':
+                    if (inputString[readIndex + 2] == 'A') {
+                        currentChar = ':';
+                        readIndex += 2;
                     }
+                    break;
+                case '0':
+                    currentChar = ' ';
+                    readIndex += 2;
+                    break;
+                case '8':
+                    currentChar = '(';
+                    readIndex += 2;
+                    break;
+                case '9':
+                    currentChar = ')';
+                    readIndex += 2;
+                    break;
                 }
-                break;
-            case '/':
-                currentChar = '\\';
-                break;
+            }
+            break;
+        case '/':
+            currentChar = '\\';
+            break;
         }
         if ((currentChar >= 32 && currentChar <= 126) && !std::isspace(currentChar)) {
             inputString[writeIndex] = currentChar;
@@ -132,7 +283,7 @@ void ProcessMatchingString(std::string& match, std::unordered_set<std::string>& 
 
                 // Replace the numeric part of the device path with the correct drive letter and a colon
                 if (driveLetter != 0) {
-                    std::string replacement = std::string(1, driveLetter) + ":";
+                    std::string replacement = std::string(1, static_cast<char>(driveLetter)) + ":";
                     match.replace(pos, end - pos, replacement);
                 }
             }
@@ -151,7 +302,8 @@ void ProcessMatchingString(std::string& match, std::unordered_set<std::string>& 
     if (match.find("ProgramFiles(x86)") != std::string::npos) {
         size_t pos = match.find("ProgramFiles(x86)");
         match.replace(pos, 17, "Program Files (x86)");
-    } else if (match.find("ProgramFiles") != std::string::npos) {
+    }
+    else if (match.find("ProgramFiles") != std::string::npos) {
         size_t pos = match.find("ProgramFiles");
         match.replace(pos, 12, "Program Files");
     }
@@ -167,7 +319,7 @@ void ProcessMatchingString(std::string& match, std::unordered_set<std::string>& 
         std::transform(lowercaseMatch.begin(), lowercaseMatch.end(), lowercaseMatch.begin(), ::tolower);
 
         if (printedMatches.find(lowercaseMatch) == printedMatches.end() && match.length() <= 110 && match.length() > 4) {
-        printedMatches.insert(lowercaseMatch); // Insert the lowercase match into the set to keep track of it
+            printedMatches.insert(lowercaseMatch); // Insert the lowercase match into the set to keep track of it
 
             // Print the modified match in the desired output.
             if (outputChoice == 'C' || outputChoice == 'c') {
@@ -175,7 +327,8 @@ void ProcessMatchingString(std::string& match, std::unordered_set<std::string>& 
                 std::cout << "Accessed file: ";
                 RESET_TEXT_COLOR(); // Reset text color
                 std::cout << match << std::endl;
-            } else if (outputChoice == 'F' || outputChoice == 'f') {
+            }
+            else if (outputChoice == 'F' || outputChoice == 'f') {
                 (*output) << "Accessed file: " << match << std::endl;
             }
         }
@@ -196,9 +349,10 @@ void ProcessMatchingString(std::string& match, std::unordered_set<std::string>& 
         if (outputChoice == 'C' || outputChoice == 'c') {
             SET_TEXT_COLOR_BLUE(); // Set text color to blue
             std::cout << "Executed file: ";
-            RESET_TEXT_COLOR(); // Reset text color
+            RESET_TEXT_COLOR(); // Reset text color so that the match is printed in white
             std::cout << match << std::endl;
-        } else if (outputChoice == 'F' || outputChoice == 'f') {
+        }
+        else if (outputChoice == 'F' || outputChoice == 'f') {
             (*output) << "Executed file: " << match << std::endl;
         }
     }
@@ -206,7 +360,7 @@ void ProcessMatchingString(std::string& match, std::unordered_set<std::string>& 
 
 int main(int argc, char* argv[]) {
     InitializeLowercaseConversionTable();
-    
+
     std::string filename;
     std::vector<char> buffer;
     std::string overlapData;
@@ -216,7 +370,8 @@ int main(int argc, char* argv[]) {
     // Check if a filename is provided as a command-line argument, otherwise prompt the user to enter a file path
     if (argc > 1) {
         filename = argv[1];
-    } else {
+    }
+    else {
         std::cout << "Enter the file path of your memory image (Example: D:\\Downloads\\memdump.mem): ";
         std::getline(std::cin, filename);
     }
@@ -229,11 +384,15 @@ int main(int argc, char* argv[]) {
         std::cout << "Do you want to print the matched strings to the console (C) or to a file (F)? ";
         std::cin >> outputChoice;
 
-        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+        // Clear the input buffer
+        while (std::cin.get() != '\n') {
+            // Continue reading characters and do nothing with them until a newline is found
+        }
 
         if (outputChoice == 'C' || outputChoice == 'c' || outputChoice == 'F' || outputChoice == 'f') {
             validChoice = true;
-        } else {
+        }
+        else {
             std::cerr << "Invalid choice. Please enter 'C' for console or 'F' for file." << std::endl;
         }
     }
@@ -290,22 +449,22 @@ int main(int argc, char* argv[]) {
             // Clear the overlapData variable as it has been processed.
             overlapData.clear();
 
-/**
- * The overlapData variable is used to handle overlapping data between successive chunks of data read from a memory image file. 
- * The program processes the memory image file in chunks for more efficient data processing.
- * overlapData is employed to ensure that any partial information at the end of one chunk is retained and combined with the data in the next chunk. 
- * This prevents splitting and processing of incomplete information that might span across two chunks.
-*/
+            /**
+             * The overlapData variable is used to handle overlapping data between successive chunks of data read from a memory image file.
+             * The program processes the memory image file in chunks for more efficient data processing.
+             * overlapData is employed to ensure that any partial information at the end of one chunk is retained and combined with the data in the next chunk.
+             * This prevents splitting and processing of incomplete information that might span across two chunks.
+            */
 
             size_t pos1, pos2;
 
-            /** 
+            /**
                 Search for specific substrings in the data, process and print them.
                 These searches are related to file access or execution evidence.
                 Also, they handle different formats of the same information.
-            */ 
+            */
 
-            /** 
+            /**
              * "file:///" -> Explorer string (evidence of file accessed/opened).
              * "ImageName" -> SgrmBroker string.
              * "AppPath" -> CDPUserSvc and TextInputHost strings.
@@ -392,7 +551,7 @@ int main(int argc, char* argv[]) {
                 if (it != dataSubstring.end() && !hasSpecialCharactersBetween) {
                     pos2 = pos1 + static_cast<size_t>(std::distance(dataSubstring.begin(), it));
                     // Increment +13 here to skip the "ImageName":" part of the string, leaving only the device path.
-                    std::string match = data.substr(pos1 + 13, pos2 - pos1 - 13 + 4); 
+                    std::string match = data.substr(pos1 + 13, pos2 - pos1 - 13 + 4);
                     ProcessMatchingString(match, printedMatches, outputChoice, output);
                 }
             }
@@ -442,14 +601,14 @@ int main(int argc, char* argv[]) {
                     size_t start = (pos1 == data.find("!!") ? (pos1 + 2) : (pos1 + 4)); // Skip 2 characters if no spaces between characters were found, 4 otherwise
                     size_t endPos = pos2 + ((pos2 == data.find(searchStringWithSpaces, pos1)) ? 7 : 4);
 
-                    /** 
-                     * 
+                    /**
+                     *
                      * This code block checks if a DPS string with a correct format was found to avoid false flagging corrupt data.
                      * I will take !!svchost.exe!2092/10/12:19:58:29! as an example to explain this part of the code.
                      * Each character is checked. For example, a DPS string will always have a digit in the first position after ".exe!" or ". e x e !".
                      * We can analyze if at a certain bit of the string, there is a digit, a colon, a slash, etc... to check if a DPS string was found.
-                     * 
-                    */ 
+                     *
+                    */
 
                     bool CorrectFormat = false;
                     if (endPos < data.length() - 20) {
@@ -478,7 +637,8 @@ int main(int argc, char* argv[]) {
                             c18 = data[endPos + 36]; // 2
                             c19 = data[endPos + 38]; // 9
                             c20 = data[endPos + 40]; // !
-                        } else {
+                        }
+                        else {
                             // If ".exe!" was found, use normal positions since there are no spaces between characters to skip
                             c1 = data[endPos + 1]; // 2
                             c2 = data[endPos + 2]; // 0
@@ -502,11 +662,11 @@ int main(int argc, char* argv[]) {
                             c20 = data[endPos + 20]; // !
                         }
                         // Check if the characters at these positions are digits and the last character is a slash
-                        if (isdigit(c1) && isdigit(c2) && isdigit(c3) && isdigit(c4) && c5 == '/' 
-                         && isdigit(c6) && isdigit(c7) && c8 == '/' && isdigit(c9) && isdigit(c10)
-                         && c11 == ':' && isdigit(c12) && isdigit(c13) && c14 == ':' && isdigit(c15)
-                         && isdigit(c16) && c17 == ':' & isdigit(c18) & isdigit(c19) & c20 == '!') {
-                         CorrectFormat = true;
+                        if (isdigit(c1) && isdigit(c2) && isdigit(c3) && isdigit(c4) && c5 == '/'
+                            && isdigit(c6) && isdigit(c7) && c8 == '/' && isdigit(c9) && isdigit(c10)
+                            && c11 == ':' && isdigit(c12) && isdigit(c13) && c14 == ':' && isdigit(c15)
+                            && isdigit(c16) && c17 == ':' && isdigit(c18) && isdigit(c19) && c20 == '!') {
+                            CorrectFormat = true;
                         }
                     }
 
@@ -542,10 +702,13 @@ int main(int argc, char* argv[]) {
             // Store the last part of data (220 characters) for overlap with the next chunk.
             // This ensures that any partial information at the end of the chunk is retained for the next iteration.
             overlapData = data.substr(data.size() - 220);
-        } else {
+        }
+        else {
             done = true;
         }
     }
+
+    std::vector<std::string> nonDeletedFiles;
 
     // Check if any printed matches correspond to non-existing files and print a message
     for (const std::string& printedMatch : printedMatches) {
@@ -555,12 +718,31 @@ int main(int argc, char* argv[]) {
                 if (outputChoice == 'C' || outputChoice == 'c') {
                     SET_TEXT_COLOR_RED(); // Set text color to red
                     std::cout << "Deleted file (file could not be found): ";
-                    RESET_TEXT_COLOR(); // Reset text color
+                    RESET_TEXT_COLOR(); // Reset text color so that the match is printed in white
                     std::cout << printedMatch << std::endl;
-                } else if (outputChoice == 'F' || outputChoice == 'f') {
+                }
+                else if (outputChoice == 'F' || outputChoice == 'f') {
                     (*output) << "Deleted file (file could not be found): " << printedMatch << std::endl;
                 }
             }
+            else {
+                nonDeletedFiles.push_back(printedMatch); // Store non-deleted files
+            }
+        }
+    }
+
+    TrustVerifyWrapper wrapper;
+    std::set<std::wstring> unsignedFiles;
+
+    // Iterate through non-deleted files and check for digital signatures
+    for (const std::string& nonDeletedFile : nonDeletedFiles) {
+        std::wstring wideFilePath(nonDeletedFile.begin(), nonDeletedFile.end());
+        if (!wrapper.VerifyFileSignature(wideFilePath)) {
+            SET_TEXT_COLOR_YELLOW(); // Set text color to yellow
+            std::wcout << L"Unsigned file detected: " << std::endl;
+            RESET_TEXT_COLOR(); // Reset text color so that the match is printed in white
+            std::wcout << wideFilePath << std::endl;
+            unsignedFiles.insert(wideFilePath);
         }
     }
 
